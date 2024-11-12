@@ -1,0 +1,19 @@
+Welcome to my POLI 428 folder. The class description is as follows:
+
+Political Science 428 (Advanced Statistical Analysis) is considered exceptionally rigorous by both
+the faculty and students. It provides a strong foundation in applying regression models using
+simulations to understand the properties of those models. In addition to the standard linear
+regression model (including logarithmic, polynomial, and interaction models), students learn
+generalized linear models (logit, ordered and multinomial logit, count models), and
+multilevel/hierarchical model. Students also learn techniques of causal inference including
+analyzing experiments, matching, instrumental variable and regression discontinuity models. It
+includes training in statistical software (R) and how to estimate both frequentist and Bayesian
+models. Students are required to learn how to interpret and present regression results to an
+audience without statistical expertise.
+
+I worked on a variety of datasets and conducted a variety of analyses, including some of the following:
+Forecasted the Biden vote share (and confidence interval) in 2024 from Leading Economic Indicators data
+Analyzed a randomized control trial for HIV infected using Poisson and negative binomial models
+Created wage growth models using random coefficients
+Replicated Acemoglu, Johnson, and Robinson (2001) analysis on institutional quality, expropriation risk, and economic growth via instrumental variables models
+Analyzed close elections and policy outcomes using regression discontinuity designs
