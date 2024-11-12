@@ -1,0 +1,536 @@
+---
+title: "LABS"
+author: "GBH"
+date: "2023-09-07"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r combine}
+
+#install.packages("random")
+
+library(dplyr)
+library(tibble)
+library(random)
+library(readxl)
+
+##Emails In Database
+
+belize <- read.csv("/Users/Kendra/Box/Subject Pool Project/Bureaucrat Webscraping Data/belize/belize_data.csv")
+head(belize)
+ls(belize)
+
+costa_rica <- read.csv("/Users/Kendra/Box/Subject Pool Project/Bureaucrat Webscraping Data/costa rica/costarica_deputies.csv")
+head(costa_rica)
+ls(costa_rica)
+
+el_sal <- read.csv("/Users/Kendra/Box/Subject Pool Project/Bureaucrat Webscraping Data/el salvador/el_salvador.csv")
+head(el_sal)
+ls(el_sal)
+
+mexico <- dbConnect(SQLite(), dbname = "mexico.db")
+
+paraguay <- read.csv("/Users/Kendra/Box/Subject Pool Project/Bureaucrat Webscraping Data/paraguay/paraguay_scraped_emails_sorted.csv")
+head(paraguay)
+ls(paraguay)
+
+paraguay_names <- read.csv("/Users/Kendra/Box/Subject Pool Project/Bureaucrat Webscraping Data/paraguay/paraguay_payroll_names.csv")
+head(paraguay_names)
+ls(paraguay_names)
+
+peru <- read.csv("/Users/Kendra/Box/Subject Pool Project/Bureaucrat Webscraping Data/peru/peru.csv")
+head(peru)
+ls(peru)
+
+#Emails to be Generated
+
+argentina <- read.csv("/Users/Kendra/Box/Subject Pool Project/Bureaucrat Webscraping Data/argentina/datos.csv")
+head(argentina)
+ls(argentina)
+
+##Email format: first.last@domain.com
+generate_random_emails <- function(guatemala.na, domain = "comunicaciones.gob.gt") {
+  emails <- vector("character", length = nrow(guatemala.na))
+  for (i in 1:nrow(guatemala.na)) {
+    name_parts <- strsplit(guatemala.na[i, 1], " ")[[1]]
+    first_name <- tolower(name_parts[1])
+    last_name <- tolower(name_parts[length(name_parts) - 1])
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(first_name, ".", last_name, "@", domain)
+    emails[i] <- email
+  }
+  
+  return(emails)
+}
+
+
+comunicaciones.gob.gt <- generate_random_emails(guatemala.na)
+
+print(comunicaciones.gob.gt)
+
+
+
+
+brazil <- read.csv("/Users/Kendra/Box/Subject Pool Project/Bureaucrat Webscraping Data/brazil/brazil_gov_people_deduped.csv")
+head(brazil)
+ls(brazil)
+
+##Email format: first.last@domain.com
+generate_random_emails <- function(guatemala.na, domain = "comunicaciones.gob.gt") {
+  emails <- vector("character", length = nrow(guatemala.na))
+  for (i in 1:nrow(guatemala.na)) {
+    name_parts <- strsplit(guatemala.na[i, 1], " ")[[1]]
+    first_name <- tolower(name_parts[1])
+    last_name <- tolower(name_parts[length(name_parts) - 1])
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(first_name, ".", last_name, "@", domain)
+    emails[i] <- email
+  }
+  
+  return(emails)
+}
+
+comunicaciones.gob.gt <- generate_random_emails(guatemala.na)
+
+print(comunicaciones.gob.gt)
+
+
+
+
+chile <- read.csv("/Users/Kendra/Box/Subject Pool Project/Bureaucrat Webscraping Data/chile/portaltransparencia_cl.csv")
+head(chile)
+ls(chile)
+
+chile.na <- subset(chile, select = Nombre.completo)
+
+##Email format: first.last@domain.com
+##Types: first and last with no dot, first and last with dot; try with all last names; first initial and last (seemed more prevalent)3
+generate_random_emails <- function(chile.na, domain = "comunicaciones.gob.gt") {
+  emails <- vector("character", length = nrow(chile.na))
+  for (i in 1:nrow(chile.na)) {
+    name_parts <- strsplit(chile.na[i, 1], " ")[[1]]
+    last_name <- tolower(name_parts[1])
+    first_name <- tolower(name_parts[length(name_parts) - 1])
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(first_name, ".", last_name, "@", domain)
+    emails[i] <- email
+  }
+  
+  return(emails)
+}
+
+chile <- generate_random_emails(chile.na)
+
+print(chile)
+
+
+colombia <- read.csv("/Users/Kendra/Box/Subject Pool Project/Bureaucrat Webscraping Data/colombia/columbia.csv")
+head(colombia)
+ls(colombia)
+
+
+##For each round, replace the "place" and the domain for each respective bureau
+##firstname.lastname@domain.com (first variation)
+generate_random_emails <- function(colombia, domain = "registraduria.gov.co") {
+  emails <- vector("character", length = nrow(colombia))
+  for (i in 1:nrow(colombia)) {
+    name_parts <- strsplit(colombia[i, 1], " ")[[1]]
+    first_name <- tolower(name_parts[1])
+    if (length(name_parts) == 4) {
+      last_name <- tolower(name_parts[3])
+    } else {
+    last_name <- tolower(name_parts[length(name_parts)]) }
+    if (colombia[i, "place"] == "REGISTRADURIA NACIONAL DEL ESTADO CIVIL") {
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(first_name, ".", last_name, "@", domain)
+    emails[i] <- email
+    } else {
+      email <- NULL
+    }
+  }
+  
+  return(emails)
+}
+
+co1 <- generate_random_emails(colombia)
+co3 <- generate_random_emails(colombia)
+co5 <- generate_random_emails(colombia)
+co14 <- generate_random_emails(colombia)
+
+# print(co1[colombia$place == "BANCO AGRARIO DE COLOMBIA S.A."])
+
+##firstname.lastname@domain.com (second variation)
+generate_random_emails <- function(colombia, domain = "registraduria.gov.co") {
+  emails <- vector("character", length = nrow(colombia))
+  for (i in 1:nrow(colombia)) {
+    name_parts <- strsplit(colombia[i, 1], " ")[[1]]
+    first_name <- tolower(name_parts[1])
+    if (length(name_parts) == 4) {
+      last_name <- tolower(name_parts[3])
+    } else {
+    last_name <- tolower(name_parts[2]) }
+    if (colombia[i, "place"] == "REGISTRADURIA NACIONAL DEL ESTADO CIVIL") {
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(first_name, ".", last_name, "@", domain)
+    emails[i] <- email
+    } else {
+      email <- NULL
+    }
+  }
+  
+  return(emails)
+}
+
+co2 <- generate_random_emails(colombia)
+co4 <- generate_random_emails(colombia)
+co6 <- generate_random_emails(colombia)
+co15 <- generate_random_emails(colombia)
+
+colombia2 <- c(co2, co4)
+colombia2 <- colombia2[colombia2 != "null"]
+print(colombia2[colombia$place == "ECOPETROL S.A."])
+
+colombia$email1 <- c(co1, co3)
+colombia$email2 <- colombia2
+
+##fsthirdf@domain.com
+generate_random_emails <- function(colombia, domain = "icbf.gov.co") {
+  emails <- vector("character", length = nrow(colombia))
+  for (i in 1:nrow(colombia)) {
+    name_parts <- strsplit(colombia[i, 1], " ")[[1]]
+    firstletter_firstname <- substr(tolower(name_parts[1]), 1, 1)
+    firstletter_secondname <- substr(tolower(name_parts[2]), 1, 1)
+    thirdname <- tolower(name_parts[3])
+    firstletter_fourthname <- substr(tolower(name_parts[4]), 1, 1)
+    if (colombia[i, "place"] == "UNIVERSIDAD NACIONAL DE COLOMBIA") {
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(firstletter_firstname, firstletter_secondname, thirdname, firstletter_fourthname, "@", domain)
+    emails[i] <- email
+    } else {
+      email <- NULL
+    }
+  }
+  
+  return(emails)
+}
+
+co7 <- generate_random_emails(colombia)
+
+
+##fsecondt@domain.com
+generate_random_emails <- function(colombia, domain = "procuraduria.gov.co") {
+  emails <- vector("character", length = nrow(colombia))
+  for (i in 1:nrow(colombia)) {
+    name_parts <- strsplit(colombia[i, 1], " ")[[1]]
+    firstletter_firstname <- substr(tolower(name_parts[1]), 1, 1)
+    secondname <- tolower(name_parts[2])
+    firstletter_thirdname <- substr(tolower(name_parts[3]), 1, 1)
+    if (colombia[i, "place"] == "PROCURADURIA GENERAL DE LA NACION") {
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(firstletter_firstname, secondname, firstletter_thirdname, "@", domain)
+    emails[i] <- email
+    } else {
+      email <- NULL
+    }
+  }
+  
+  return(emails)
+}
+
+co8 <- generate_random_emails(colombia)
+co17 <- generate_random_emails(colombia)
+
+##fsecondth@domain.com
+generate_random_emails <- function(colombia, domain = "icbf.gov.co") {
+  emails <- vector("character", length = nrow(colombia))
+  for (i in 1:nrow(colombia)) {
+    name_parts <- strsplit(colombia[i, 1], " ")[[1]]
+    firstletter_firstname <- substr(tolower(name_parts[1]), 1, 1)
+    secondname <- tolower(name_parts[2])
+    firsttwoletter_thirdname <- substr(tolower(name_parts[3]), 1, 2)
+    if (colombia[i, "place"] == "UNIVERSIDAD NACIONAL DE COLOMBIA") {
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(firstletter_firstname, secondname, firsttwoletter_thirdname, "@", domain)
+    emails[i] <- email
+    } else {
+      email <- NULL
+    }
+  }
+  
+  return(emails)
+}
+
+co9 <- generate_random_emails(colombia)
+
+
+##fthirdf@domain.com
+generate_random_emails <- function(colombia, domain = "icbf.gov.co") {
+  emails <- vector("character", length = nrow(colombia))
+  for (i in 1:nrow(colombia)) {
+    name_parts <- strsplit(colombia[i, 1], " ")[[1]]
+    firstletter_firstname <- substr(tolower(name_parts[1]), 1, 1)
+    thirdname <- tolower(name_parts[3])
+    firstletter_fourthname <- substr(tolower(name_parts[4]), 1, 1)
+    if (colombia[i, "place"] == "UNIVERSIDAD NACIONAL DE COLOMBIA") {
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(firstletter_firstname, thirdname, firstletter_fourthname, "@", domain)
+    emails[i] <- email
+    } else {
+      email <- NULL
+    }
+  }
+  
+  return(emails)
+}
+
+co10 <- generate_random_emails(colombia)
+
+
+##fisthirdfo@domain.com
+generate_random_emails <- function(colombia, domain = "icbf.gov.co") {
+  emails <- vector("character", length = nrow(colombia))
+  for (i in 1:nrow(colombia)) {
+    name_parts <- strsplit(colombia[i, 1], " ")[[1]]
+    firsttwoletter_firstname <- substr(tolower(name_parts[1]), 1, 2)
+    firstletter_secondname <- substr(tolower(name_parts[2]), 1, 1)
+    thirdname <- tolower(name_parts[3])
+    firsttwoletter_fourthname <- substr(tolower(name_parts[4]), 1, 2)
+    if (colombia[i, "place"] == "UNIVERSIDAD NACIONAL DE COLOMBIA") {
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(firsttwoletter_firstname, firstletter_secondname, thirdname, firsttwoletter_fourthname, "@", domain)
+    emails[i] <- email
+    } else {
+      email <- NULL
+    }
+  }
+  
+  return(emails)
+}
+
+co11 <- generate_random_emails(colombia)
+
+
+##fsthirdfo@domain.com
+generate_random_emails <- function(colombia, domain = "icbf.gov.co") {
+  emails <- vector("character", length = nrow(colombia))
+  for (i in 1:nrow(colombia)) {
+    name_parts <- strsplit(colombia[i, 1], " ")[[1]]
+    firstletter_firstname <- substr(tolower(name_parts[1]), 1, 1)
+    firstletter_secondname <- substr(tolower(name_parts[2]), 1, 1)
+    thirdname <- tolower(name_parts[3])
+    firsttwoletter_fourthname <- substr(tolower(name_parts[4]), 1, 2)
+    if (colombia[i, "place"] == "UNIVERSIDAD NACIONAL DE COLOMBIA") {
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(firstletter_firstname, firstletter_secondname, thirdname, firsttwoletter_fourthname, "@", domain)
+    emails[i] <- email
+    } else {
+      email <- NULL
+    }
+  }
+  
+  return(emails)
+}
+
+co12 <- generate_random_emails(colombia)
+
+
+##fsthird@domain.com
+generate_random_emails <- function(colombia, domain = "procuraduria.gov.co") {
+  emails <- vector("character", length = nrow(colombia))
+  for (i in 1:nrow(colombia)) {
+    name_parts <- strsplit(colombia[i, 1], " ")[[1]]
+    firstletter_firstname <- substr(tolower(name_parts[1]), 1, 1)
+    firstletter_secondname <- substr(tolower(name_parts[2]), 1, 1)
+    thirdname <- tolower(name_parts[3])
+    if (colombia[i, "place"] == "PROCURADURIA GENERAL DE LA NACION") {
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(firstletter_firstname, firstletter_secondname, thirdname, "@", domain)
+    emails[i] <- email
+    } else {
+      email <- NULL
+    }
+  }
+  
+  return(emails)
+}
+
+co13 <- generate_random_emails(colombia)
+
+#fthird@domain.com
+generate_random_emails <- function(colombia, domain = "procuraduria.gov.co") {
+  emails <- vector("character", length = nrow(colombia))
+  for (i in 1:nrow(colombia)) {
+    name_parts <- strsplit(colombia[i, 1], " ")[[1]]
+    firstletter_firstname <- substr(tolower(name_parts[1]), 1, 1)
+    thirdname <- tolower(name_parts[3])
+    if (colombia[i, "place"] == "PROCURADURIA GENERAL DE LA NACION") {
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(firstletter_firstname, thirdname, "@", domain)
+    emails[i] <- email
+    } else {
+      email <- NULL
+    }
+  }
+  
+  return(emails)
+}
+
+co16 <- generate_random_emails(colombia)
+co18 <- generate_random_emails(colombia)
+
+
+#fsecond@domain.com
+generate_random_emails <- function(colombia, domain = "procuraduria.gov.co") {
+  emails <- vector("character", length = nrow(colombia))
+  for (i in 1:nrow(colombia)) {
+    name_parts <- strsplit(colombia[i, 1], " ")[[1]]
+    firstletter_firstname <- substr(tolower(name_parts[1]), 1, 1)
+    secondname <- tolower(name_parts[2])
+    if (colombia[i, "place"] == "PROCURADURIA GENERAL DE LA NACION") {
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(firstletter_firstname, secondname, "@", domain)
+    emails[i] <- email
+    } else {
+      email <- NULL
+    }
+  }
+  
+  return(emails)
+}
+
+co19 <- generate_random_emails(colombia)
+
+dom_rep <- read.csv("/Users/Kendra/Box/Subject Pool Project/Bureaucrat Webscraping Data/dominican_republic/dominican_republic.csv")
+head(dom_rep)
+ls(dom_rep)
+
+
+
+
+
+
+guatemala <- read.csv("/Users/Kendra/Box/Subject Pool Project/Bureaucrat Webscraping Data/guatemala/guatemala_data.csv")
+head(guatemala)
+ls(guatemala)
+
+
+
+
+
+
+panama <- read_excel("/Users/Kendra/Box/Subject Pool Project/Bureaucrat Webscraping Data/panama/contraloria_gob_panama.xlsx")
+head(panama)
+ls(panama)
+
+##Generating emails
+
+guatemala.na <- subset(guatemala, select = -c(ministry,role))
+ls(guatemala.na)
+head(guatemala.na)
+
+
+##Email format: first.last@domain.com
+generate_random_emails <- function(guatemala.na, domain = "comunicaciones.gob.gt") {
+  emails <- vector("character", length = nrow(guatemala.na))
+  for (i in 1:nrow(guatemala.na)) {
+    name_parts <- strsplit(guatemala.na[i, 1], " ")[[1]]
+    first_name <- tolower(name_parts[1])
+    last_name <- tolower(name_parts[length(name_parts) - 1])
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(first_name, ".", last_name, "@", domain)
+    emails[i] <- email
+  }
+  
+  return(emails)
+}
+
+comunicaciones.gob.gt <- generate_random_emails(guatemala.na)
+
+print(comunicaciones.gob.gt)
+
+
+##Email format: flast@domain.com
+
+generate_random_emails <- function(guatemala.na, domain = "mcd.gob.gt") {
+  emails <- vector("character", length = nrow(guatemala.na))
+  for (i in 1:nrow(guatemala.na)) {
+    name_parts <- strsplit(guatemala.na[i, 1], " ")[[1]]
+    first_initial <- tolower(substr(name_parts[1], 1, 1))
+    last_name <- tolower(name_parts[length(name_parts)])
+    random_number <- sample(1000:9999, 1)
+    email <- paste0(first_initial, last_name, "@", domain)
+    emails[i] <- email
+  }
+  
+  return(emails)
+}
+
+mcd.gob.gt <- generate_random_emails(guatemala.na)
+
+print(mcd.gob.gt)
+
+##Combine the Data
+
+#Combining Belize and Costa Rica
+bel.em <- subset(belize,select = -c(phone,role))
+ls(bel.em)
+
+costa.rica <- rename(costa.rica, name = first_name)
+ls(costa.rica)
+head(costa.rica)
+cos.em <- subset(costa.rica, select = -c(first_surname,gender,political_faction,province,second_surname))
+ls(cos.em)
+
+bel.cost <- rbind(bel.em,cos.em,by = "email")
+head(bel.cost)
+tail(bel.cost)
+
+#Combining bel.cost with El Salvador
+el.em <- subset(el.sal, select = -c(active,committee_id,curriculum,enabled,id,institution_id,position,updated_at,address,created_at,functions,institution_dependency_id,marked,phone,priority))
+ls(el.em)
+
+bel.cost.el <- rbind(bel.cost,el.em,by = "email")
+head(bel.cost.el)
+tail(bel.cost.el)
+
+#Combining bel.cost.el with Peru
+
+
+
+peru.em <- subset(peru, select = -c(phone, title))
+bel.cost.el.pe <- rbind(bel.cost.el,peru.em,by = "email")
+tail(bel.cost.el.pe)
+
+
+#Add name to paraguay
+
+paraguay$name <- paraguay
+ls(paraguay)
+head(paraguay)
+
+?cbind
+
+#Combining bel.cost.el.pe with Paraguay
+
+par.em <- subset(paraguay, select = -c(Instances_found, Organization, Webpage_scraped))
+bel.cost.el.par <- rbind(bel.cost.el.pe,par.em,by = "email")
+tail(bel.cost.el.pe.par)
+
+#Combining bel.cost.el.par with Peru
+
+
+
+
+
+```
+
+
+
+
+
