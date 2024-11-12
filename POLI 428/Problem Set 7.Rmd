@@ -1,0 +1,353 @@
+---
+title: "Problem Set 7"
+author: "Kendra Pinegar; Completion Code: 1811"
+date: "2024-03-06"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Do Exercise 20.4 in ROS.
+```{r}
+#20.4a
+
+library(tidyverse)
+library(rstanarm)
+library(arm)
+library(survey)
+
+data = as.data.frame(c(1:1000))
+data$"c(1:1000)" = NULL
+
+#i
+data$x = rnorm(1000, 0, 1)
+
+#ii
+cat("X is a pre-treatment predictor that, an exogenous variable that influences the output of the linear regression.")
+
+#iii
+
+probability = 1/(1 + exp(0.2*data$x))
+data$z = rbinom(1000, 1, probability)
+
+summary(probability) #data values are within the 0.05-0.95 range
+
+related = stan_glm(z ~ x, family = binomial(link = "logit"), data = data, refresh = 0)
+print(related, digits = 3)
+cat("As you can clearly see, as x and z are clearly related, given the significant coefficient for x.")
+
+#iv
+
+data$y0 = rep(NA, 1000)
+data$y1 = rep(NA, 1000)
+data$e0 = rep(NA, 1000)
+data$e1 = rep(NA, 1000)
+
+for (i in 1:1000){
+  
+  data$e0[i] = rnorm(1, 0, 1)
+  data$e1[i] = rnorm(1, 0, 1)
+  data$y0[i] = data$x[i] + data$e0[i]
+  data$y1[i] = 5 + data$x[i] + data$e1[i]
+}
+
+mean(data$y1) - mean(data$y0) #this is close enough to 5
+
+data$yobserved = rep(NA, 1000)
+
+for (i in 1:1000){
+  
+  data$yobserved[i] = ifelse(data$z[i] == 0, data$y0[i], data$y1[i])
+  
+}
+
+#v
+
+#i already did this; data is my data set
+
+#vi
+sate = mean(data$y1) - mean(data$y0)
+sate
+
+#vii
+finaldata = data.frame(data$x, data$yobserved, data$z)
+finaldata = finaldata %>%
+  rename(x = data.x) %>%
+  rename(y = data.yobserved) %>%
+  rename(z = data.z)
+
+#20.4b
+
+#i
+estimate1 = mean(finaldata$y[finaldata$z == 1]) - mean(finaldata$y[finaldata$z == 0])
+estimate1
+
+#ii
+fit = stan_glm(y ~ x + z, data = finaldata, refresh = 0)
+print(fit, digits = 3)
+estimate2 = coef(fit)[3]
+estimate2
+
+#iii
+
+ggplot(data = finaldata,
+       aes(x = x,
+           y = y)) +
+  geom_point(aes(color = as.factor(z))) +
+  scale_color_manual(values = c("blue", "red")) +
+  labs(color = "Group")
+
+#iv. Estimate the treatment effect using propensity score matching. If you were the researcher, would you be comfortable using propensity matching in this setting?
+
+set.seed(50)
+ps_fit = stan_glm(z ~ x, family = binomial(link = "logit"), data = finaldata, refresh = 0)
+print(ps_fit, digits = 3)
+
+pscores = apply(posterior_linpred(ps_fit), 2, mean) #do this to get the point estimate of each of the 1000 predictions
+matches_wr = matching(z = finaldata$z, score = pscores, replace = TRUE) #this pairs the closest propensity score
+matched_wr = matches_wr$cnts
+table(matched_wr)
+
+bal_wr = balance(rawdata = finaldata, treat = finaldata$z, matched = matches_wr$cnts, estimand = 'ATT')
+propensity_data = finaldata[matches_wr$match.ind,]
+
+fit_propensity = stan_glm(y ~ x + z, data = propensity_data, refresh = 0)
+print(fit_propensity, digits = 3)
+
+cat("I would probably opt to not use propensity matching because there were very few observations removed from the data, and it doesn't make sense to use propensity score matching if the covariates are already pretty well balanced.")
+#20.4c
+
+#i
+
+ggplot(data = data,
+       aes(x = x)) +
+  geom_point(aes(y = y1,
+                 color = "y1")) +
+  geom_point(aes(y = y0,
+                 color = "y0")) +
+  scale_color_manual(values = c("red", "blue")) +
+  labs(colour = "Potential Outcomes")
+
+
+fit_1 = stan_glm(y ~ x*z, data = finaldata, refresh = 0)
+print(fit_1, digits = 3)
+
+loo = loo(fit)
+loo1 = loo(fit_1)
+
+loo_compare(loo, loo1)
+
+cat("There does not seem to be cause for adding an interaction to the model to estimate causal effects for the observed data because both potential outcomes seem to model a linear line. Additionally, the interaction term is not significant when you run the linear regression. Finally, a loo comparison indicates that the initial model (the model without the interaction) is statistically significantly better than the model with the interaction. Also, the space between the two sets of data seem to be rather consistent.")
+
+#ii
+bias1 = estimate1 - sate
+bias1
+
+bias2 = estimate2 - sate
+bias2
+
+#iii
+bias1/sd(finaldata$y)
+bias2/sd(finaldata$y)
+
+#iv
+diff_estimate = rep(NA, 1000)
+reg_estimate = rep(NA, 1000)
+diff_bias = rep(NA, 1000)
+reg_bias = rep(NA, 1000)
+
+for (i in 1:1000){
+  data$z_new = sample(data$z, 1000)
+  data$y0_new = data$x + data$e0
+  data$y1_new = 5 + data$x + data$e1
+  data$yobserved_new = ifelse(data$z_new == 0, data$y0_new, data$y1_new)
+  diff_estimate[i] = mean(data$y1_new[data$z_new == 1]) - mean(data$y0_new[data$z_new == 0])
+  reg_estimate[i] = coef(lm(yobserved_new ~ x + z_new, data = data))[3]
+  diff_bias[i] = diff_estimate[i] - sate
+  reg_bias[i] = reg_estimate[i] - sate
+  
+}
+
+mean(diff_bias)
+hist(diff_bias)
+mean(reg_bias)
+hist(reg_bias)
+
+#I worked alone on this portion of the problem set
+```
+
+### Do Exercise 20.2 in ROS.
+```{r}
+library(foreign)
+work = read.dta("/Users/kap237/Box/PERSONAL WORK/POLI 428/ROS-Examples-master/Lalonde/NSW_dw_obs.dta")
+
+#20.2a
+
+
+#i
+mean(work$re78[work$treat == 1]) - mean(work$re78[work$treat == 0])
+
+#ii
+fit_2 = stan_glm(re78 ~ treat + age + educ + black + hisp + married + nodegree + re74 + re75, data = work, refresh = 0)
+print(fit_2, digits = 3)
+coef(fit_2)[2]
+
+#20.2b
+work_sub = subset(work, re74 != 0 | re75 != 0)
+
+fit_3 = stan_glm(re78 ~ treat + age + educ + black + hisp + married + nodegree + re74 + re75, data = work_sub, refresh = 0)
+print(fit_3, digits = 3)
+
+#omitting variables
+print(stan_glm(re78 ~ treat + educ + black + hisp + married + nodegree + re74 + re75, data = work_sub, refresh = 0), digits = 3)
+print(stan_glm(re78 ~ treat + age + black + hisp + married + nodegree + re74 + re75, data = work_sub, refresh = 0), digits = 3)
+print(stan_glm(re78 ~ treat + age + educ + hisp + married + nodegree + re74 + re75, data = work_sub, refresh = 0), digits = 3)
+print(stan_glm(re78 ~ treat + age + educ + black + married + nodegree + re74 + re75, data = work_sub, refresh = 0), digits = 3)
+
+#interacting variables
+print(stan_glm(re78 ~ treat*age + educ + black + hisp + married + nodegree + re74 + re75, data = work_sub, refresh = 0), digits = 3)
+#not significant
+print(stan_glm(re78 ~ treat*educ + age + black + hisp + married + nodegree + re74 + re75, data = work_sub, refresh = 0), digits = 3)
+#not significant
+
+cat("Given the size of the standard error of the experimental benchmark, excluding pre-treatment indicator variables or including interactions into the model does not significantly change the treatment effect. These estimate are usually within one standard error (a few within two standard errors) of the experimental treatment effect, or if they are outside of at least two standard errors, the calculated treatment coefficient is insignificant.")
+
+#20.2c
+
+#round 1
+set.seed(50)
+ps_fit_1 = stan_glm(treat ~ age + married + educ, family = binomial(link = "logit"), data = work_sub, refresh = 0)
+print(ps_fit_1, digits = 3)
+
+pscores_1 = apply(posterior_linpred(ps_fit_1), 2, mean) #do this to get the point estimate of each of the 1000 predictions
+matches_wr_1 = matching(z = work_sub$treat, score = pscores_1, replace = TRUE) #this pairs the closest propensity score
+matched_wr_1 = matches_wr_1$cnts
+table(matched_wr_1)
+
+bal_wr_1 = balance(rawdata = work_sub, treat = work_sub$treat, matched = matches_wr_1$cnts, estimand = 'ATT')
+bal_wr_1 #maybe next time incorporate black, re74, re75
+propensity_data_1 = work_sub[matches_wr_1$match.ind,]
+
+#round 2
+set.seed(50)
+ps_fit_2 = stan_glm(treat ~ re74 + re75 + age + educ + black + married + nodegree, family = binomial(link = "logit"), data = work_sub, refresh = 0)
+print(ps_fit_2, digits = 3)
+
+pscores_2 = apply(posterior_linpred(ps_fit_2), 2, mean)
+matches_wr_2 = matching(z = work_sub$treat, score = pscores_2, replace = TRUE)
+matched_wr_2 = matches_wr_2$cnts
+table(matched_wr_2)
+
+bal_wr_2 = balance(rawdata = work_sub, treat = work_sub$treat, matched = matches_wr_2$cnts, estimand = 'ATT')
+bal_wr_2
+propensity_data_2 = work_sub[matches_wr_2$match.ind,]
+
+#round 3
+set.seed(50)
+ps_fit_3 = stan_glm(treat ~ age + educ + nodegree + nodegree + re74 + re75, family = binomial(link = "logit"), data = work_sub, refresh = 0)
+print(ps_fit_3, digits = 3)
+
+pscores_3 = apply(posterior_linpred(ps_fit_3), 2, mean)
+matches_wr_3 = matching(z = work_sub$treat, score = pscores_3, replace = TRUE)
+matched_wr_3 = matches_wr_3$cnts
+table(matched_wr_3)
+
+bal_wr_3 = balance(rawdata = work_sub, treat = work_sub$treat, matched = matches_wr_3$cnts, estimand = 'ATT')
+bal_wr_3
+propensity_data_3 = work_sub[matches_wr_3$match.ind,]
+
+#probably round 2 is best
+propensity_estimate1 = mean(propensity_data_2$re78[propensity_data_2$treat == 1]) - mean(propensity_data_2$re78[propensity_data_2$treat == 0])
+propensity_estimate1
+
+propensity_fit = stan_glm(re78 ~ treat + age + educ + black + hisp + married + nodegree + re74 + re75, data = propensity_data_2, refresh = 0)
+print(propensity_fit, digits = 3)
+propensity_estimate2 = coef(propensity_fit)[2]
+propensity_estimate2
+
+cat("These estimates are much closer than the initial regression, but they still aren't super close.")
+
+#20.2d
+cat("Part b estimates that when an individual participates in a job training program, their earnings in 1978 was, on average,", coef(fit_3)[2], "less US dollars than those who did not participate in the job training program.")
+
+cat("Part c estimates that when an individual participates in a job training program, their earnings in 1978 was, on average,", coef(propensity_fit)[2], "more US dollars than those who did not participate in the job training program.")
+
+cat("We are making inferences about populations that were employed in the pre-treatment years, specifically 1974 and 1975.")
+
+#20.2e
+fit_4 = stan_glm(re78 ~ treat + age + educ + black + hisp + married + nodegree + re75, data = work_sub, refresh = 0)
+print(fit_4, digits = 3)
+
+#omitting variables
+print(stan_glm(re78 ~ treat + educ + black + hisp + married + nodegree + re75, data = work_sub, refresh = 0), digits = 3)
+print(stan_glm(re78 ~ treat + age + black + hisp + married + nodegree + re75, data = work_sub, refresh = 0), digits = 3)
+print(stan_glm(re78 ~ treat + age + educ + hisp + married + nodegree + re75, data = work_sub, refresh = 0), digits = 3)
+print(stan_glm(re78 ~ treat + age + educ + black + married + nodegree + re75, data = work_sub, refresh = 0), digits = 3)
+
+#interacting variables
+print(stan_glm(re78 ~ treat*age + educ + black + hisp + married + nodegree + re75, data = work, refresh = 0), digits = 3)
+#not significant
+print(stan_glm(re78 ~ treat*educ + age + black + hisp + married + nodegree + re75, data = work, refresh = 0), digits = 3)
+#not significant
+
+cat("Given the size of the standard error of the experimental benchmark, excluding pre-treatment indicator variables or including interactions into the model does not significantly change the treatment effect. These estimate are usually within one standard error (a few within two standard errors) of the experimental treatment effect, or if they are outside of at least two standard errors, the calculated treatment coefficient is insignificant.")
+
+#round 1
+set.seed(50)
+ps_fit_1 = stan_glm(treat ~ age + married + educ, family = binomial(link = "logit"), data = work_sub, refresh = 0)
+print(ps_fit_1, digits = 3)
+
+pscores_1 = apply(posterior_linpred(ps_fit_1), 2, mean) #do this to get the point estimate of each of the 1000 predictions
+matches_wr_1 = matching(z = work_sub$treat, score = pscores_1, replace = TRUE) #this pairs the closest propensity score
+matched_wr_1 = matches_wr_1$cnts
+table(matched_wr_1)
+
+bal_wr_1 = balance(rawdata = work_sub, treat = work_sub$treat, matched = matches_wr_1$cnts, estimand = 'ATT')
+bal_wr_1 #maybe next time incorporate black, re74, re75
+propensity_data_1 = work_sub[matches_wr_1$match.ind,]
+
+#round 2
+set.seed(50)
+ps_fit_2 = stan_glm(treat ~ re75 + age + educ + black + married + nodegree, family = binomial(link = "logit"), data = work_sub, refresh = 0)
+print(ps_fit_2, digits = 3)
+
+pscores_2 = apply(posterior_linpred(ps_fit_2), 2, mean)
+matches_wr_2 = matching(z = work_sub$treat, score = pscores_2, replace = TRUE)
+matched_wr_2 = matches_wr_2$cnts
+table(matched_wr_2)
+
+bal_wr_2 = balance(rawdata = work_sub, treat = work_sub$treat, matched = matches_wr_2$cnts, estimand = 'ATT')
+bal_wr_2
+propensity_data_2 = work_sub[matches_wr_2$match.ind,]
+
+#round 3
+set.seed(50)
+ps_fit_3 = stan_glm(treat ~ age + educ + nodegree + nodegree + re74 + re75, family = binomial(link = "logit"), data = work_sub, refresh = 0)
+print(ps_fit_3, digits = 3)
+
+pscores_3 = apply(posterior_linpred(ps_fit_3), 2, mean)
+matches_wr_3 = matching(z = work_sub$treat, score = pscores_3, replace = TRUE)
+matched_wr_3 = matches_wr_3$cnts
+table(matched_wr_3)
+
+bal_wr_3 = balance(rawdata = work_sub, treat = work_sub$treat, matched = matches_wr_3$cnts, estimand = 'ATT')
+bal_wr_3
+propensity_data_3 = work_sub[matches_wr_3$match.ind,]
+
+#round 2 is still probably best
+propensity_estimate1 = mean(propensity_data_2$re78[propensity_data_2$treat == 1]) - mean(propensity_data_2$re78[propensity_data_2$treat == 0])
+propensity_estimate1
+
+propensity_fit = stan_glm(re78 ~ treat + age + educ + black + hisp + married + nodegree + re75, data = propensity_data_2, refresh = 0)
+print(propensity_fit, digits = 3)
+propensity_estimate2 = coef(propensity_fit)[2]
+propensity_estimate2
+
+cat("The treatment coefficient decreases by just a little bit, indicating that earnings in 1974 is not likely to be an important term necessary for satisfying the ignorability assumption.")
+
+#I worked with and changed my answers by comparing with Vanessa.
+```

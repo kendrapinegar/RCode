@@ -1,0 +1,394 @@
+---
+title: "Problem Set 3"
+author: "Kendra Pinegar 7670"
+date: "2024-01-31"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+9.6
+```{r}
+
+#9.6a
+#4.8a
+theta_data = log(1.42)
+theta_data
+
+#4.8b
+se_data = (log(1.98)-log(1.02))/(2*1.96)
+se_data
+
+#9.6b
+theta_prior = 0
+se_prior = 0.1
+theta_bayes = (theta_prior/se_prior^2 + theta_data/se_data^2) / (1/(se_prior^2) + 1/(se_data^2))
+se_bayes = sqrt(1/(1/se_prior^2 + 1/se_data^2))
+
+
+theta_bayes = (theta_prior/se_prior^2 + theta_data/se_data^2) /
+(1/se_prior^2 + 1/se_data^2)
+se_bayes = sqrt(1/(1/se_prior^2 + 1/se_data^2))
+
+
+#9.6c
+exp(theta_bayes)
+
+cat("The mean of this distribution is 1.1")
+
+#9.6d
+ci_lower = exp(theta_bayes - 1.96*se_bayes)
+ci_higher = exp(theta_bayes + 1.96*se_bayes)
+
+cat("The 95% confidence interval is [0.9, 1.3]")
+```
+
+10.3
+```{r}
+
+var1 = rnorm(1000, 0, 1)
+var2 = rnorm(1000, 0, 1)
+
+data = data.frame(var1, var2)
+
+fit = lm(var2 ~ var1, data = data)
+
+cat("The slope coefficient of this regression is not statistically significant, given that the p-value is 0.221")
+```
+
+10.4
+```{r}
+
+library(rstanarm)
+
+z_scores = rep(NA, 100)
+
+for (i in 1:100){
+  var1 = rnorm(1000, 0, 1)
+  var2 = rnorm(1000, 0, 1)
+  data = data.frame(var1, var2)
+  fit = stan_glm(var2 ~ var1, data = data, refresh = 0)
+  z_scores[i] = coef(fit)[2] / se(fit)[2]
+}
+
+cat("Only", sum(abs(z_scores > 2)), "z_scores exceed 2 in absolute value and achieve statistical significance.")
+```
+
+10.6
+```{r}
+
+library(ggplot2)
+
+#10.6a
+beauty = read.csv("/Users/BYU Rental/Box/PERSONAL WORK/POLI 428/ROS-Examples-master/Beauty/data/beauty.csv")
+
+fit = lm(eval ~ beauty + female + age + minority, data = beauty, refresh = 0)
+
+a_hat = round(coef(fit)[1], 2)
+a_hat
+b_hat = round(coef(fit)[2], 2)
+b_hat
+c_hat = round(coef(fit)[3], 2)
+c_hat
+d_hat = coef(fit)[4]
+d_hat
+e_hat = round(coef(fit)[5], 2)
+e_hat
+
+ggplot(data = beauty,
+       aes(x = beauty,
+           y = eval,
+           color = "magenta")) +
+  geom_point() +
+  geom_abline(slope = b_hat, intercept = a_hat) +
+  scale_color_manual(values = "magenta") +
+  theme(legend.position = "none") +
+  annotate("text", x = 1, y = 2.2, label = "y = 4.25 + 0.14x1 - 0.2x2 - 0.003x3 - 0.11x4")
+
+residuals = resid(fit)
+fitted = fitted(fit)
+plot(fitted, residuals, xlab = "Fitted Model", ylab = "Residuals")
+
+#coefficients
+cat("The regression coefficient", a_hat, "indciates that instructors with a beauty level of 0, who are not female, who are 0 years old, and who are not minorities had, on average,", a_hat, " points on the teaching evaluations.")
+
+cat("The regression coefficient", b_hat, "indicates that when comparing two similar instructors with different levels of beauty, an instructor that was given one additional point of beauty in student evaluations had, on average,", b_hat, "more points on the teaching evaluations in comparison to the instructor with one less beauty point.")
+
+cat("The regression coefficient", c_hat, "indicates that when comparing two similar instructors with different genders, a female instructor had, on average,", abs(c_hat), "less points on the teaching evaluations than male instructors.")
+
+cat("The regression coefficient", d_hat, "indicates that when comparing two similar instructors with different ages, an instructor that was one year older had, on average,", abs(d_hat), "less points on the teaching evaluations in comparison to an instructor that was one year younger.")
+
+cat("The regression coefficient", e_hat, "indicates that when comparing two similar instructors with different races, an instructor that was a minority had, on average,", abs(e_hat), "less points on the teaching evaluations in comparison to a non-minority instructor.")
+
+
+cat("The residual standard deviation", sigma(fit), "indicates that teaching evaluations will be within", sigma(fit), "points of the linear predictor for about 68% of the data points and within", 2*sigma(fit), "points of the linear precitor for about 95% of the data points.")
+
+cat("The regression coefficient", b_hat, "indicates that, when comparing two similar incumbents with different LEIs, an incumbent with an additional unit of the LEI index during his time in office has, on average,", b_hat, "percent more of a vote share than an incumbent with one unit less.")
+
+#10.6b
+fit_1 = lm(eval ~ beauty + minority + nonenglish + minority:nonenglish, data = beauty, refresh = 0)
+
+a_hat = coef(fit_1)[1]
+b_hat = coef(fit_1)[2]
+c_hat = coef(fit_1)[3]
+d_hat = coef(fit_1)[4]
+e_hat = coef(fit_1)[5]
+
+cat("The regression coefficient", a_hat, "indicates that instructors with a beauty level of 0, who are not minorities, and who speak English as a first language had, on average,", a_hat, "points on the teaching evaluations.")
+
+cat("The regression coefficient", b_hat, "indicates that when comparing two instructors with different levels of beauty, all else being the same, an instructor with one additional point of beauty in student evaluations had, on average,", b_hat, "more points on the teaching evaluations in comparison to an instructor with one less beauty point.")
+
+cat("The regression coefficient", c_hat, "indicates that when comparing two instructors where one is a minority and one isn't, all else being the same, an instructor who is a minority had, on average,", abs(c_hat), "less points on the teaching evaluations in comparison to a nonminority instructor.")
+
+cat("The regression coefficient", d_hat, "indicates that when comparing two instructors where one whose first language isn't English and the other whose first language is English, all else being the same, an instructor whose first language isn't English had, on average,", abs(d_hat), "less points on the teaching evaluations in comparison to a instructor whose first language is English.")
+
+cat("The regression coefficient", e_hat, "indicates that when comparing two instructors who are both minorities but whose first language differs (one doesn't speak English as a first language and the other does), all else being the same, a minority instructor whose first language isn't English had, on average,", abs(c_hat + e_hat), "less points on the teaching evaluations in comparison to a minority instructor whose first language is English.")
+
+cat("That same coefficient also means that when comparing two instructors whose first language is not English but where one is a minority and the other isn't, all else being the same, a minority instructor had, on average,", abs(d_hat + e_hat), "less points on the teaching evaluations in comparison to a nonminority instructor.")
+
+fit_2 = lm(eval ~ beauty + female + minority + beauty:minority, data = beauty, refresh = 0)
+
+a_hat = coef(fit_2)[1]
+b_hat = coef(fit_2)[2]
+c_hat = coef(fit_2)[3]
+d_hat = coef(fit_2)[4]
+e_hat = coef(fit_2)[5]
+
+cat("The regression coefficient", a_hat, "indicates that instructors with a beauty level of 0, who are not female, and who are not minorities, had, on average,", a_hat, "points on the teaching evaluations.")
+
+cat("The regression coefficient", b_hat, "indicates that when comparing two instructors with different levels of beauty, all else being the same, an instructor with one additional point of beauty in student evaluations had, on average,", b_hat, "more points on the teaching evaluations in comparison to an instructor with one less beauty point.")
+
+cat("The regression coefficient", c_hat, "indicates that when comparing two instructors with different genders, all else being the same, a female instrcutor had, on average,", abs(c_hat), "less points on the teaching evaluations in comparison to a male instructor.")
+
+cat("The regression coefficient", d_hat, "indicates that when comparing two instructors where one is a minority and one isn't, all else being the same, an instructor who is a minority had, on average,", abs(d_hat), "less points on the teaching evaluations in comparison to a nonminority instructor.")
+
+cat("The regression coefficient", e_hat, "indicates that when comparing two instructors who are both minorities but had different levels of beauty, all else being the same, a minority instructor with onee additional point of beauty in student evaluations had, on average,", abs(b_hat + e_hat), "less points on the teaching evaluations in comparison to a minority instructor with one less point of beauty.")
+
+cat("That same coefficient also means that when comparing two instructors who have the same level of beauty but where one is a minority and the other not, an instructor who is a minority had, on average,", abs(d_hat + e_hat), "less points on the teaching evaluations in comparison to a nonminority instructor.")
+```
+
+10.7
+```{r}
+
+#10.7a
+
+fit = lm(eval ~ beauty + age + female + nonenglish, data = beauty)
+new_a = data.frame(age = 50, female = 1, nonenglish = 0, beauty = -1)
+new_b = data.frame(age = 60, female = 0, nonenglish = 0, beauty = -0.5)
+
+instructor_a = rep(NA, 1000)
+instructor_b = rep(NA, 1000)
+
+for (i in 1:1000){
+  fit = stan_glm(eval ~ beauty + age + female + nonenglish, data = beauty, refresh = 0)
+
+  instructor_a[i] = posterior_predict(fit, newdata = new_a)
+  instructor_b[i] = posterior_predict(fit, newdata = new_b)
+}
+
+a_hat = coef(fit)[1]
+b_hat = coef(fit)[2]
+c_hat = coef(fit)[3]
+d_hat = coef(fit)[4]
+e_hat = coef(fit)[5]
+sigma = sigma(fit)
+n = nrow(beauty)
+beauty$eval_fake1 = a_hat + b_hat*beauty$beauty + c_hat*beauty$age + d_hat*beauty$female + e_hat*beauty$nonenglish + rnorm(n, 0, sigma)
+
+#10.7b
+hist(instructor_a - instructor_b)
+sum(instructor_a - instructor_b > 0)/1000
+```
+
+11.9
+```{r}
+
+#11.9a
+library(loo)
+
+fit_1 = stan_glm(eval ~ beauty + female + age, data = beauty, refresh = 0)
+
+fit_1_loo = loo(fit_1)
+
+fit_2 = stan_glm(eval ~ beauty + female + minority + nonenglish, data = beauty, refresh = 0)
+
+fit_2_loo = loo(fit_2)
+
+fit_3 = stan_glm(eval ~ beauty + age + minority, data = beauty, refresh = 0)
+
+fit_3_loo = loo(fit_3)
+
+loo_comparison = loo_compare(fit_1_loo, fit_2_loo, fit_3_loo)
+loo_comparison
+
+#From this comparison, I conclude that fit_3 is a slightly better model because the given elpd_diff of -9.9 and se_diff of 4.4, the model is more than two standard deviations away from 0. This is not the case for fit_1 though; with an elpd_diff of -3.7 and se_diff of 3.4, meaning that the model is less than two standard deviations away from 0.
+
+
+beauty$resid_1 = resid(fit_1)
+beauty$resid_2 = resid(fit_2)
+beauty$resid_3 = resid(fit_3)
+beauty$total_resid = abs(beauty$resid_1) + abs(beauty$resid_2) + abs(beauty$resid_3)
+
+plot(beauty$beauty, beauty$total_resid)
+
+#11.9b
+
+beauty_1 = subset(beauty, total_resid > 4)
+
+#There are some x values with high predictive errors, including the values where beauty = -1.511, -0.826, -0.347, and 0.420 
+```
+
+11.5
+```{r}
+
+#11.5a
+pyth = read.delim("/Users/BYU Rental/Box/PERSONAL WORK/POLI 428/ROS-Examples-master/Pyth/pyth.txt", sep = " ")
+
+fit = lm(y ~ x1 + x2, data = pyth)
+
+a_hat = coef(fit)[1]
+b_hat = coef(fit)[2]
+c_hat = coef(fit)[3]
+
+cat("The regression coefficient", a_hat," means that when x1 and x2 are both equal to 0, all else being the same, this has, on average,", a_hat, "points of y.")
+cat("The regression coefficient", b_hat, "means that when comparing two values of x1, all else being the same, an x1 value that is one point higher has, on average,", b_hat, "more y points than an x1 value that is one point lower.")
+
+cat("The regression coefficient", c_hat, "means that when comparing two values of x2, all else being the same, an x2 value that is one point higher has, on average,", c_hat, "more points than an x1 value that is one point lower.")
+
+cat("The R^2 of this equation is 0.9724, indicating very good fit of the model.")
+
+#11.5b
+fit = stan_glm(y ~ x1 + x2, data = pyth, refresh = 0)
+
+sims = as.matrix(fit)
+n_sims = nrow(sims)
+
+par(mfrow = c(1, 2))
+
+plot(pyth$x1, pyth$y, xlab = "X1", ylab = "Y")
+x2_bar <- mean(pyth$x2)
+sims_display <- sample(n_sims, 10)
+for (i in sims_display){
+curve(cbind(1, x2_bar, x) %*% sims[i,1:3], lwd=0.5, col="gray", add=TRUE)
+}
+curve(cbind(1, x2_bar, x) %*% coef(fit), col="black", add=TRUE)
+
+plot(pyth$x2, pyth$y, xlab = "X2", ylab = "Y")
+x1_bar <- mean(pyth$x1)
+for (i in sims_display){
+curve(cbind(1, x, x1_bar) %*% sims[i,1:3], lwd=0.5, col="gray", add=TRUE)
+}
+curve(cbind(1, x, x1_bar) %*% coef(fit), col="black", add=TRUE)
+
+#11.5c
+
+par(mfrow = c(1, 1))
+resid = resid(fit)
+fitted = predict(fit)
+
+plot(fitted, resid, xlab = "Predicted Values", ylab = "Residuals")
+abline(0, 0)
+mean(resid)
+
+cat("Since the mean of the residuals is", mean(resid), "and is approaching 0, the assumptions of residuals are met.")
+
+#11.5d
+last20 = tail(pyth, n = 20)
+
+pyth$y_predict = predict(fit, newdata = last20, interval = "prediction")
+pyth$y_predict[1:40] = NA
+pyth$y_new = ifelse(is.na(pyth$y), pyth$y_predict, ifelse(is.na(pyth$y_predict), pyth$y, NA))
+
+fit = lm(y_new ~ x1 + x2, data = pyth, refresh = 0)
+
+resid = resid(fit)
+fitted = predict(fit)
+plot(fitted, resid, xlab = "Predicted Values", ylab = "Residuals")
+cat("IDK I'm somewhat confident about these predictions. Do I need to do anything specific to answer this? Doesn't seem clear.")
+
+```
+
+11.6
+```{r}
+
+#11.6a
+x1 = c(1:100)
+x2 = rbinom(100, 1, 0.5)
+e = rt(100, 4)
+y_linpred = 3 + 0.1*x1 + 0.5*x2
+y = 3 + 0.1*x1 + 0.5*x2 + e
+
+df = data.frame(x1, x2, y)
+
+fit = stan_glm(y ~ x1 + x2, data = df, refresh = 0)
+
+a_hat = coef(fit)[1]
+b_hat = coef(fit)[2]
+c_hat = coef(fit)[3]
+a_se = se(fit)[1]
+b_se = se(fit)[2]
+c_se = se(fit)[3]
+
+true_intercept = 3
+true_x1 = 0.1
+true_x2 = 0.5
+
+intercept_lower = a_hat - a_se
+intercept_higher = a_hat + a_se
+intercept_lower < true_intercept & true_intercept < intercept_higher
+
+x1_lower = b_hat - b_se
+x1_higher = b_hat + b_se
+x1_lower < true_x1 & true_x1 < x1_higher
+
+x2_lower = c_hat - c_se
+x2_higher = c_hat + c_se
+x2_lower < true_x2 & true_x2 < x2_higher
+
+#11.6b
+
+a_hat = rep(NA, 1000)
+b_hat = rep(NA, 1000)
+c_hat = rep(NA, 1000)
+a_se = rep(NA, 1000)
+b_se = rep(NA, 1000)
+c_se = rep(NA, 1000)
+
+for (i in 1:1000){
+  x1 = c(1:100)
+  x2 = rbinom(100, 1, 0.5)
+  e = rt(100, 4)
+  y_linpred = 3 + 0.1*x1 + 0.5*x2
+  y = 3 + 0.1*x1 + 0.5*x2 + e
+  
+  df = data.frame(x1, x2, y)
+  
+  fit = stan_glm(y ~ x1 + x2, data = df, refresh = 0)
+  
+  a_hat[i] = coef(fit)[1]
+  b_hat[i] = coef(fit)[2]
+  c_hat[i] = coef(fit)[3]
+  a_se[i] = se(fit)[1]
+  b_se[i] = se(fit)[2]
+  c_se[i] = se(fit)[3]
+}
+
+intercept_lower = a_hat - a_se
+intercept_higher = a_hat + a_se
+sum(intercept_lower < true_intercept & true_intercept < intercept_higher)/1000
+
+x1_lower = b_hat - b_se
+x1_higher = b_hat + b_se
+sum(x1_lower < true_x1 & true_x1 < x1_higher)/1000
+
+x2_lower = c_hat - c_se
+x2_higher = c_hat + c_se
+sum(x2_lower < true_x2 & true_x2 < x2_higher)/1000
+
+```
+I compared my answers with Vanessa for each question, but the only question I changed my code for was question 3, specifically the code concerning loo.
+

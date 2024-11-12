@@ -1,0 +1,443 @@
+---
+title: "Problem Set 4"
+author: "Kendra Pinegar"
+date: "2024-02-07"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 1
+#### 13.11
+```{r}
+
+library(rstanarm)
+
+#13.11a
+
+rodents = read.delim("/Users/kap237/Box/PERSONAL WORK/POLI 428/ROS-Examples-master/Rodents/rodents.dat", sep = " ")
+
+#The problem says to combine categories as appropriate, so I am going to do that
+rodents$race[rodents$race == 4] = 3
+rodents$race[rodents$race == 6] = 5
+rodents$race[rodents$race == 5] = 4
+rodents$race[rodents$race == 7] = 4
+table(rodents$race)
+#race 1 = white
+#race 2 = black
+#race 3 = hispanic
+#race 4 = other
+
+fit = stan_glm(rodent2 ~ as.factor(race), family = binomial(link = "logit"), data = rodents, refresh = 0)
+print(fit, digits = 3)
+
+cat("The intercept coefficient of", coef(fit)[1], "means that, on average, the logged odds ratio for white people will be", coef(fit)[1])
+
+cat("The race 2 coefficient of", coef(fit)[2], "means that, on average, the logged odds ratio for black people will be", coef(fit)[2], "in comparison to white people.")
+
+cat("The race 3 coeffient of", coef(fit)[3], "means that, on average, the logged odds ratio for hispanic people will be", coef(fit)[3], "in comparison to white people.")
+
+cat("The race 4 coefficient of", coef(fit)[4], "means that, on average, the logged odds ratio for other races (asian, american indian, etc.) will be", coef(fit)[4], "in comparison to white people.")
+
+
+#13.11b
+fit_1 = stan_glm(rodent2 ~ as.factor(race) + stories + under6 + poverty, family = binomial(link = "logit"), data = rodents, refresh = 0)
+print(fit_1, digits = 3)
+
+cat("The intercept coefficient of", coef(fit_1)[1], "means that, on average, the logged odds ratio for white people will be", coef(fit_1)[1])
+
+cat("The race 2 coefficient of", coef(fit_1)[2], "means that, on average, the logged odds ratio for black people will be", coef(fit_1)[2], "in comparison to white people.")
+
+cat("The race 3 coeffient of", coef(fit_1)[3], "means that, on average, the logged odds ratio for hispanic people will be", coef(fit_1)[3], "in comparison to white people.")
+
+cat("The race 4 coefficient of", coef(fit_1)[4], "means that, on average, the logged odds ratio for other races (asian, american indian, etc.) will be", coef(fit_1)[4], "in comparison to white people.")
+
+cat("The coefficient", coef(fit_1)[5], "means that, on average, the logged odds ratio for an additional number of floors, in comparison to one less number of floors and white people, is", coef(fit_1)[5])
+
+cat("The coefficient", coef(fit_1)[6], "means that, on average, the logged odds ratio for an additional number of children under the age of 6, in comparison to one less child under the age of 6 in a white family, is", coef(fit_1)[6])
+
+cat("The coefficient", coef(fit_1)[7], "means that, on average, the logged odds ratio for being in poverty, in comparison to not being in poverty and white, is", coef(fit_1)[7])
+
+#13.11c
+fit_2 = glm(rodent2 ~ as.factor(race) + stories + under6 + poverty, family = binomial(link = "logit"), data = rodents)
+summary(fit_2)
+
+cat("The stan_glm intercept", coef(fit_1)[1], "is relatively close to the glm logit intercept", coef(fit_2)[1])
+
+cat("The stan_glm race 2 coefficient", coef(fit_1)[2], "is relatively close to the glm logit race 2 coefficient", coef(fit_2)[2])
+
+cat("The stan_glm race 3 coefficient", coef(fit_1)[3], "is relatively close to the glm logit race 3 coefficient", coef(fit_2)[3])
+
+cat("The stan_glm race 4 coefficient", coef(fit_1)[4], "is relatively close to the glm logit logit race 4 coefficient", coef(fit_2)[4])
+
+cat("The stan_glm coefficient for the number of stories", coef(fit_1)[5], "is relatively close to the glm logit coefficient for the number of stories", coef(fit_2)[5])
+
+cat("The stan_glm coefficient for the number of children under 6", coef(fit_1)[6], "is relatively close to the glm logit coefficient for the number of children under 6", coef(fit_2)[6])
+
+cat("The stan_glm coefficient for the poverty dummy variable", coef(fit_1)[7], "is relatively close to the glm logit coefficient for the poverty dummy variable", coef(fit_2)[7])
+
+cat("The stan_glm intercept standard error", se(fit_1)[1], "is relatively close to the glm logit intercept standard error 0.23314")
+
+cat("The stan_glm race 2 standard error", se(fit_1)[2], "is relatively close to the glm logit race 2 standard error 0.17333")
+
+cat("The stan_glm race 3 standard error", se(fit_1)[3], "is relatively close to the glm logit race 3 standard error 0.17425")
+
+cat("The stan_glm race 4 standard error", se(fit_1)[4], "is relatively close to the glm logit race 4 standard error 0.24575")
+
+cat("The stan_glm standard error for the number of stories", se(fit_1)[5], "is relatively close to the glm logit standard error for the number of stories 0.03341")
+
+cat("The stan_glm standard error for the number of children under 6", se(fit_1)[6], "is relatively close to the glm logit standard error for the number of children under 6 0.11089")
+
+cat("The stan_glm standard error for the poverty dummy variable", se(fit_1)[7], "is relatively close to the glm logit standard error for the poverty dummy variable 0.15015")
+
+rodents_1 = subset(rodents, !is.na(rodents$rodent2))
+
+fit_1 = stan_glm(rodent2 ~ as.factor(race) + stories + under6 + poverty, family = binomial(link = "logit"), data = rodents_1, refresh = 0)
+predict_1 = fitted(fit_1)
+error_rate = mean((predict_1 > 0.5 & rodents_1$rodent2 == 0) | (predict_1 < 0.5 & rodents_1$rodent2 == 1), na.rm = TRUE)
+error_rate
+
+fit_2 = glm(rodent2 ~ as.factor(race) + stories + under6 + poverty, family = binomial(link = "logit"), data = rodents_1)
+predict_2 = fitted(fit_2) 
+error_rate = mean((predict_2 > 0.5 & rodents_1$rodent2 == 0) | (predict_2 < 0.5 & rodents_1$rodent2 == 1), na.rm = TRUE)
+error_rate
+
+cat("My error rates are the same, so the models are both equally fit; also they're both under 0.5, so they're pretty reliable models.")
+
+#13.11d
+fit_3 = glm(rodent2 ~ as.factor(race) + stories + under6 + poverty, family = binomial(link = "probit"), data = rodents)
+summary(fit_3)
+
+cat("The stan_glm intercept", coef(fit_1)[1], "is somewhat close to the glm probit intercept multiplied by 1.6,", coef(fit_3)[1]*1.6)
+
+cat("The stan_glm race 2 coefficient", coef(fit_1)[2], "is somewhat close to the glm probit race 2 coefficient multiplied by 1.6,", coef(fit_3)[2]*1.6)
+
+cat("The stan_glm race 3 coefficient", coef(fit_1)[3], "is somewhat close to the glm probit race 3 coefficient multiplied by 1.6,", coef(fit_3)[3]*1.6)
+
+cat("The stan_glm race 4 coefficient", coef(fit_1)[4], "is somewhat close to the glm probit race 4 coefficient multiplied by 1.6,", coef(fit_3)[4]*1.6)
+
+cat("The stan_glm coefficient for the number of stories", coef(fit_1)[5], "is somewhat close to the glm probit coefficient for the number of stories multiplied by 1.6,", coef(fit_3)[5]*1.6)
+
+cat("The stan_glm coefficient for the number of children under 6", coef(fit_1)[6], "is somewhat close to the glm probit coefficient for the number of children under 6 multiplied by 1.6,", coef(fit_3)[6]*1.6)
+
+cat("The stan_glm coefficient for the poverty dummy variable", coef(fit_1)[7], "is somewhat close to the glm probit coefficient for the poverty dummy variable multiplied by 1.6,", coef(fit_3)[7]*1.6)
+
+cat("The stan_glm intercept standard error", se(fit_1)[1], "is relatively close to the glm probit intercept standard error multiplied by 1.6,", 0.12860*1.6)
+
+cat("The stan_glm race 2 standard error", se(fit_1)[2], "is relatively close to the glm probit race 2 standard error multiplied by 1.6,", 0.09546*1.6)
+
+cat("The stan_glm race 3 standard error", se(fit_1)[3], "is relatively close to the glm probit race 3 standard error multiplied by 1.6,", 0.09739*1.6)
+
+cat("The stan_glm race 4 standard error", se(fit_1)[4], "is relatively close to the glm probit race 4 standard error multiplied by 1.6,", 0.13613*1.6)
+
+cat("The stan_glm standard error for the number of stories", se(fit_1)[5], "is relatively close to the glm probit standard error for the number of stories multipled by 1.6,", 0.01906*1.6)
+
+cat("The stan_glm standard error for the number of children under 6", se(fit_1)[6], "is relatively close to the glm probit standard error for the number of children under 6 multiplied by 1.6,", 0.06636*1.6)
+
+cat("The stan_glm standard error for the poverty dummy variable", se(fit_1)[7], "is relatively close to the glm probit standard error for the poverty dummy variable multiplied by 1.6,", 0.08886*1.6)
+
+fit_1 = stan_glm(rodent2 ~ as.factor(race) + stories + under6 + poverty, family = binomial(link = "logit"), data = rodents_1, refresh = 0)
+predict_1 = fitted(fit_1)
+error_rate = mean((predict_1 > 0.5 & rodents_1$rodent2 == 0) | (predict_1 < 0.5 & rodents_1$rodent2 == 1), na.rm = TRUE)
+error_rate
+
+fit_3 = glm(rodent2 ~ as.factor(race) + stories + under6 + poverty, family = binomial(link = "probit"), data = rodents_1)
+predict_3 = fitted(fit_3) 
+error_rate = mean((predict_3 > 0.5 & rodents_1$rodent2 == 0) | (predict_3 < 0.5 & rodents_1$rodent2 == 1), na.rm = TRUE)
+error_rate
+
+cat("My error rates are just about the same, so the models are both equally fit; also they're both under 0.5, so they're pretty reliable models.")
+
+```
+
+## Question 2
+#### 13.5
+```{r}
+
+#point estimate
+1*(0.46/4)-0.5*(0.46/4)
+
+#se
+1*(0.04/4)-0.5*(0.04/4)
+
+#50% interval
+qnorm(0.75)
+
+ci50 = 0.46 + qnorm(0.75)*0.04
+upper_ci50 = ci50/4*0.5
+ci50 = 0.46 - 1.96*0.04
+lower_ci50 = ci50/4*0.5
+
+cat("The 50% CI is [", lower_ci50, ",", upper_ci50, "].")
+
+#95% interval
+qnorm(0.975)
+
+ci95 = 0.46 + qnorm(0.975)*0.04
+upper_ci95 = (ci95/4)*0.5
+ci95 = 0.46 - qnorm(0.975)*0.04
+lower_ci95 = (ci95/4)*0.5
+
+cat("The 95% CI is [", lower_ci95, ",", upper_ci95, "].")
+
+#13.5b
+
+wells = read.csv("/Users/kap237/Box/PERSONAL WORK/POLI 428/ROS-Examples-master/Arsenic/data/wells.csv")
+
+fit_4 = stan_glm(switch ~ dist100 + arsenic, family = binomial(link = "logit"), data = wells, refresh = 0)
+
+new = data.frame(dist100 = 0.5, arsenic = c(0.5, 1))
+
+point_predict = predict(fit_4, newdata = new, type = "response")
+point_predict[2]-point_predict[1]
+
+epred = posterior_epred(fit_4, newdata = new)
+print(c(mean(epred[,2]-epred[,1]), sd(epred[,2]-epred[,1])))
+
+quantile(epred[,2]-epred[,1], c(0.25, 0.75))
+cat("That is the 50% confidence interval.")
+
+quantile(epred[,2]-epred[,1], c(0.025, 0.975))
+cat("That is the 95% confidence interval.")
+```
+
+#### 14.3
+```{r}
+
+#14.3a
+
+fit_5 = stan_glm(switch ~ dist, family = binomial(link = "logit"), data = wells, refresh = 0)
+print(fit_5, digits = 3)
+
+#14.3b
+wells$switch_jitter = jitter(wells$switch, 0.05)
+
+plot(wells$dist, wells$switch_jitter, xlab = "Distance (meters)", ylab = "Probability of switching wells")
+curve(invlogit(coef(fit_5)[1] + coef(fit_5)[2]*x), add=TRUE)
+
+#14.3c
+library(arm)
+resids = residuals(fit_5)
+predict = fitted(fit_5)
+
+par(mfrow = c(1,2))
+plot(predict, resids, xlab = "Estimated Probabilities of Switching", ylab = "Residuals", main = "Residual Plot")
+abline(h = 0)
+binnedplot(predict, resids)
+
+par(mfrow = c(1,1))
+
+#14.4d
+
+case_null = mean(round(abs(wells$switch-mean(predict))))
+error_rate = mean((predict > 0.5 & wells$switch == 0) | (predict < 0.5 & wells$switch == 1))
+
+cat("The error_rate for the fitted model is", error_rate, "and the error rate of the null model is", error_rate1, "so the fitted model is a better model for predicting probability than the null.")
+
+#https://www.geeksforgeeks.org/how-to-use-the-jitter-function-in-r-for-scatterplots/
+```
+
+#### 14.7
+```{r}
+
+#14.7a
+
+wells$logged_arsenic = log(wells$arsenic)
+wells$logged_arsenic_c = wells$logged_arsenic - mean(wells$logged_arsenic)
+
+wells$dist_2sd = (wells$dist - mean(wells$dist))/(2*sd(wells$dist))
+
+fit_6 = stan_glm(switch ~ dist_2sd*logged_arsenic_c, family = binomial(link = "logit"), data = wells, refresh = 0)
+print(fit_6, digits = 3)
+
+cat("The intercept coefficient", coef(fit_6)[1], "means that, on average, when distance and logged arsenic values are at their means, the logged odds ratio is", coef(fit_6)[1])
+
+cat("The standard error of the intercept is", se(fit_6)[1], "and the estimate for the intercept is more than two standard errors away from 0, indicating that the estimate is a valid predictor.")
+
+cat("The distance coefficient", coef(fit_6)[2], "means that, on average, when logged arsenic is at its mean and when there are an additional 2 standard deviations of distance, the logged odds ratio is", coef(fit_6)[2])
+
+cat("The standard error of the logged arsenic coefficient is", se(fit_6)[2], "and the estimate for the coefficient is more than two standard errors away from 0, indicating that this is an important predictor for the probability of switching.")
+
+cat("The logged arsenic coefficient", coef(fit_6)[3], "means that, on average, when distance remains constant at its average and when there is an additional unit of logged arsenic, there is", coef(fit_6)[3])
+
+cat("The standard error of the distance coefficient is", se(fit_6)[3], "and the estimate for the coefficient is more than two standard errors away from 0, indicating that this is an important predictor for the probability of switching.")
+
+cat("The coefficient", coef(fit_6)[4], "means that, on average, with each additional unit of logged arsenic, the value", coef(fit_6)[4], "is added to the coefficient for distance. It is also means that, on average, with each additional 2 standard deviations of distance, the value", coef(fit_6)[4], "is added to the coefficient for logged arsenic.")
+
+cat("The standard error of the interaction coefficient", coef(fit_6)[4], "and the estimate for the coefficient is less than two standard errors away from 0, indicating that this is a less important predictor for determining the probability of switching in terms of the interaction between arsenic levels and distance")
+
+#14.7b
+
+plot(wells$dist, wells$switch_jitter, xlab = "Distance (meters)", ylab = "Switching wells")
+curve(invlogit(coef(fit_6)[1] + coef(fit_6)[2]*x), add = TRUE)
+
+par(mfrow = c(1,2))
+plot(wells$dist, wells$switch_jitter, xlab = "Distance (meters)", ylab = "Probability of switching wells")
+curve(invlogit(cbind(1, x/100, 0.5, 0.5*x/100) %*% coef(fit_6)), add = TRUE)
+curve(invlogit(cbind(1, x/100, 1.0, 1.0*x/100) %*% coef(fit_6)), add = TRUE)
+text(mean(wells$dist_2sd), coef(fit_6)[3],
+     paste("if arsenic = 1.0"), adj = 0)
+text(mean(wells$dist_2sd), coef(fit_6)[1],
+     paste("if arsenic = 0.5"), adj = 0)
+
+plot(wells$logged_arsenic, wells$switch_jitter, xlab = "Logged arsenic concentration in well water", ylab = "Probability of switching wells")
+curve(invlogit(cbind(1, 0, x, x*0) %*% coef(fit_6)), add = TRUE)
+curve(invlogit(cbind(1, 0, x, x*0.5) %*% coef(fit_6)), add = TRUE)
+
+#14.7c
+fit_7 = stan_glm(switch ~ dist*logged_arsenic, family = binomial(link = "logit"), data = wells, refresh = 0)
+
+#i
+cases_i = data.frame(dist = c(0, 100),
+                     logged_arsenic = c(0, 0))
+row.names(cases_i) = c("base", "dist")
+
+subst_eff_i = predict(fit_7, type = "response", newdata = cases_i)
+subst_eff_i
+
+cat("The substantive effect of holding logged arsenic levels constant but changing distance from 0 to 100 is a", subst_eff_i[2]-subst_eff_i[1], "change in the probability of switching wells.")
+
+#ii
+cases_ii = data.frame(dist = c(100, 200),
+                      logged_arsenic = c(0, 0))
+row.names(cases_ii) = c("base", "dist")
+
+subst_eff_ii = predict(fit_7, type = "response", newdata = cases_ii)
+subst_eff_ii
+
+cat("The substantive effect of holding logged arsenic levels constant but changing distance from 100 to 200 is a", subst_eff_ii[2]-subst_eff_ii[1], "change in the probability of switching wells.")
+
+#iii
+cases_iii = data.frame(dist = c(0, 0),
+                       logged_arsenic = c(0.5, 1))
+row.names(cases_iii) = c("base", "arsenic")
+
+subst_eff_iii = predict(fit_7, type = "response", newdata = cases_iii)
+subst_eff_iii
+
+cat("The substantive effect of holding distance constant but changing the logged arsenic levels from 0.5 to 1 is a", subst_eff_iii[2]-subst_eff_iii[1], "change in the probability of switching wells.")
+
+#iv
+cases_iv = data.frame(dist = c(0, 0),
+                      logged_arsenic = c(1, 2))
+row.names(cases_iv) = c("base", "arsenic")
+
+subst_eff_iv = predict(fit_7, type = "response", newdata = cases_iv)
+subst_eff_iv
+
+cat("The substantive effect of holding distance constant but changing the logged arsenic levels from 1 to 2 is a", subst_eff_iv[2]-subst_eff_iv[1], "change in the probability of switching wells.")
+```
+
+## Question 3
+#### 13.1
+```{r}
+
+#13.1a
+load("C:/Users/BYU Rental/Box/PERSONAL WORK/POLI 428/ROS-Examples-master/NES/data/nes.rda")
+
+#kms
+#rvote is fine
+
+#income
+nes$income_c = nes$income - mean(nes$income)
+
+#gender is fine
+
+#educ1
+nes$educ_c = nes$educ1 - mean(nes$educ1)
+
+#black is fine
+
+#partyid7
+nes$partyid7 = as.numeric(nes$partyid7)
+nes$partyid7_c = nes$partyid7 - mean(nes$partyid7, na.rm = TRUE)
+
+#ideo7
+nes$ideo7 = as.numeric(nes$ideo7)
+nes$ideo7_c = nes$ideo7 - mean(nes$ideo7, na.rm = TRUE)
+
+fit_8 = stan_glm(rvote ~ income_c + gender + educ_c + black + partyid7_c + ideo7_c, family = binomial(link = "logit"), data = nes, refresh = 0)
+print(fit_8, digits = 3)
+
+cat("I'm hypothesizing that when a voter is black, in comparison to a non-black voter, he is less likely to vote for Bush than the non-black voter. Thus, I'll interact the educ1 variable with the black variable.")
+
+fit_9 = stan_glm(rvote ~ income_c + gender + educ_c*black + partyid7_c + ideo7_c, family = binomial(link = "logit"), data = nes, refresh = 0)
+print(fit_9, digits = 3)
+
+#13.1b
+cat("In terms of comparing my two models, it's important to examine the interaction variables and the variables that changed a significant amount. For the most part, the only variables that changed at all were the dummy black variable and the education variables. In the model without an interaction, holding all else constant, black voters in comparison to non-black voters had, on average, a logged odds ratio of", coef(fit_8)[5], ", while in the model with the interaction, holding all else constant, black voters who had not completed high school in comparison to non-black voters who had not completed high school had, on average, a logged odds ratio of", coef(fit_9)[5], ". In the model without an interaction, holding all else constant, voters with one additional unit of education in comparison to voters minus the one additional unit of education had, on average, a logged odds ratio of", coef(fit_8)[4], ", while in the model with the interaction, holding all else constant, voters with one additional unit of education in comparison to voters minus the one additional unit of education had, on average, a logged odds ratio of", coef(fit_9)[4], ". These are not the biggest variations, but they exist nonetheless.")
+#I'M NOT DONE WITH THIS ONE YET
+
+cat("Now, take into account the interaction: while holding all else constant, black voters who had one additional unit of schooling completed in comparison to black voters who had completed one less unit of schooling had, on average, a logged odds ratio of", coef(fit_9)[5]+coef(fit_9)[8], ".", "This essentially means that a slightly more educated black voter is more likely to vote for Bush than an uneducated black voter (high school not completed), since the logged odds ratio for the uneducated black voter is", coef(fit_9)[5], "and the logged odds ratio for the slightly more educated black voter is", coef(fit_9)[5]+coef(fit_9)[8], ". For each additional unit of education completed, the logged odds ratio increases by,", coef(fit_9)[8], ". This is one interpretation of the interaction. Here is the other. While holding all else constant and voters at the mean education level, black voters who had one additional unit of schooling completed in comparison to non-black voters who had one additional unit of schooling completed had, on average, a logged odds ratio of", coef(fit_9)[4]+coef(fit_9)[8], ". This essentially means that an educated black voter is more likely to vote for Bush than an educated non-black voters, since the logged odds ratio for the educated non-black voter is", coef(fit_9)[4], "and the logged odds ratio for the educated black voter is", coef(fit_9)[4]+coef(fit_9)[8])
+
+#13.1c
+cases_nes = data.frame(income_c = c(0, 1, 0, 0, 0, 0, 0, 0),
+                       gender = c(0, 0, 1, 0, 0, 0, 0, 0),
+                       educ_c = c(0, 0, 0, 1, 0, 0, 0, 1),
+                       black = c(0, 0, 0, 0, 1, 0, 0, 1),
+                       partyid7_c = c(0, 0, 0, 0, 0, 1, 0, 0),
+                       ideo7_c = c(0, 0, 0, 0, 0, 0, 1, 0))
+row.names(cases_nes) = c("base", "income", "gender", "educ_noblack", "black", "partyid", "ideo7", "educ_black")
+
+
+subeff_predictions = posterior_epred(fit_9, newdata = cases_nes)
+subeff = data.frame(subeff_predictions)
+
+#income
+income_eff = mean(subeff$income - subeff$base)
+income_eff
+income_eff_ci = quantile(subeff$income - subeff$base, c(.025, 0.975))
+income_eff_ci
+
+educ.eff.95ci
+#gender
+gender_eff = mean(subeff$gender - subeff$base)
+gender_eff
+gender_eff_ci = quantile(subeff$gender - subeff$base, c(.025, 0.975))
+gender_eff_ci
+
+#education
+educ_eff = mean(subeff$educ_noblack - subeff$base)
+educ_eff
+educ_eff_ci = quantile(subeff$educ_noblack - subeff$base, c(.025, 0.975))
+educ_eff_ci
+
+#black
+black_eff = mean(subeff$black - subeff$base)
+black_eff
+black_eff_ci = quantile(subeff$black - subeff$base, c(.025, 0.975))
+black_eff_ci
+
+#partyid7
+partyid_eff = mean(subeff$partyid - subeff$base)
+partyid_eff
+partyid_eff_ci = quantile(subeff$partyid - subeff$base, c(.025, 0.975))
+partyid_eff_ci
+
+#ideo7
+ideo_eff = mean(subeff$ideo7 - subeff$base)
+ideo_eff
+ideo_eff_ci = quantile(subeff$ideo7 - subeff$base, c(.025, 0.975))
+ideo_eff_ci
+
+#education and black
+educ_black_eff = mean(subeff$educ_black - subeff$base)
+educ_black_eff
+educ_black_eff_ci = quantile(subeff$educ_black - subeff$base, c(.025, 0.975))
+educ_black_eff_ci
+
+cat("The income variable is obviously important here, given that the whole point of the model was to compare how income influences the likelihood of votes in favor of Bush. Both models indicate that, when holding all else constant, a voter who has an income that is ")
+
+cat("The gender variable is important to include in this model because women are theoretically considered to be less likely to vote for Republican candidates in elections, so including this as a control can be important for understanding the comparisons between voters at different levels of income.")
+
+cat("The education level variable is important because highly-educated voters tend to have different voting behaviors than poorly-educated voters.")
+
+cat("Including the black variable (as the race variable) can be an important variable to include because different races and ethnicities often have different voting patterns between races, whereas there's more homogeneity within racial groups for voting.")
+
+cat("Party and ideology variables are important to include in this model because it makes sense that an individual who identifies with the Republican party or an individual who has conservative values was more likely to vote for Bush in comparison to a member of the Democratic party or an individual with liberal values.")
+
+```

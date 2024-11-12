@@ -1,0 +1,369 @@
+---
+title: "Problem Set 2"
+author: "Kendra Pinegar Completion code 2354"
+date: "2024-01-24"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Question 1: (8.8)
+```{r}
+
+#8.8a
+
+library(rstanarm)
+
+x = runif(100, 0, 20)
+error = rnorm(100, 0, 5)
+y = 2 + 3*x + error
+
+df = data.frame(x, y)
+
+fit_1 = lm(y ~ x, data = df)
+fit_2 = stan_glm(y ~ x, data = df, refresh = 0)
+
+print(fit_1)
+print(fit_2)
+
+cat("The results from lm and stan_glm are nearly identical.")
+
+#8.8b
+
+plot(x, y, data = df, xlab = "X", ylab = "Y")
+abline(fit_1[1], fit_1[2])
+abline(fit_2[1], fit_2[2]) #Given that the data is nearly identical, the two fitted regression lines look the same
+a_hat = coef(fit_1)[1]
+b_hat = coef(fit_1)[2]
+text(mean(df$x), a_hat + b_hat*mean(df$x),
+     paste("y =", round(a_hat, 2), "+", round(b_hat, 2), "*x"), adj = -1)
+
+#8.8c
+
+x = runif(100, 0, 50)
+error = rnorm(100, 0, 10)
+y = 4 + 3*x + error
+sd_x = sd(df$x)
+sd_y = sd(df$y)
+mean_y = mean(df$y)
+
+df = data.frame(x, y)
+
+prior = normal()
+prior_intercept = c(runif(100, -3, 14))
+
+fit_1 = lm(y ~ x, data = df)
+print(fit_1)
+slope = coef(fit_1)[2]
+intercept = coef(fit_1)[1]
+fit_2 = stan_glm(y ~ x, data = df, prior = normal(slope), prior_intercept = normal(intercept), refresh = 0)
+
+print(fit_1)
+print(fit_2)
+
+cat("I think the results from lm and stan_glm are very different? I hope.")
+
+plot(x, y, data = df, xlab = "X", ylab = "Y")
+abline(fit_1[1], fit_1[2])
+a_hat1 = coef(fit_1)[1]
+b_hat1 = coef(fit_1)[2]
+abline(fit_2[1], fit_2[2])
+a_hat2 = coef(fit_2)[1]
+b_hat2 = coef(fit_2)[2]
+
+text(16, 100,
+     paste("y =", round(a_hat1, 2), "+", round(b_hat1, 2), "*x"))
+
+text(27, 40,
+     paste("y =", round(a_hat2, 2), "+", round(b_hat2, 2), "*x"))
+
+```
+
+Question 2: (7.7 and 7.8)
+```{r}
+
+#7.7a
+x = runif(100, 0, 20)
+error = rnorm(100, 0, 5)
+y = 2 + 3*x + error
+
+fake = data.frame(x, y)
+
+fit_1 = stan_glm(y ~ x, data = fake, refresh = 0)
+print(fit_1)
+
+plot(fake$x, fake$y, xlab = "X", ylab = "Y")
+a_hat = coef(fit_1)[1]
+b_hat = coef(fit_1)[2]
+abline(a_hat, b_hat)
+text(mean(fake$x), a_hat + b_hat*mean(fake$x),
+     paste("y =", round(a_hat, 2), "+", round(b_hat, 2), "*x"), adj = -1)
+
+#7.7b
+true_slope = 3
+true_intercept = 2
+
+
+cat("I'm assuming here that 'reasonably close' means within a confidence interval of some sort, so I'm going to use the bayesian interval estimates of uncertainty to figure out if this is reasonably close.")
+
+posterior_interval(fit_1, prob = 0.95)
+
+b_hat = coef(fit_1)["x"]
+b_se = se(fit_1)["x"]
+
+cover_68 = abs(true_slope - b_hat) < b_se
+cover_68
+cover_95 = abs(true_slope - b_hat) < 2*b_se
+cover_95
+
+cat("This means that the the stan_glm value for the intercept of", b_hat, "is reasonably close to the true value 3 and within one and two SEs of 3.")
+
+a_hat = coef(fit_1)["(Intercept)"]
+a_se = se(fit_1)["(Intercept)"]
+
+cover_68 = abs(true_intercept - a_hat) < a_se
+cover_68
+cover_95 = abs(true_intercept - a_hat) < 2*a_se
+cover_95
+
+
+cat("This means that the stan_glm value for the intercept of", a_hat, "is reasonably close to the true value 2 and within one and two SEs of 2.")
+
+#7.8
+ci_95 = rep(NA, 1000)
+
+for (i in 1:1000){
+  x = runif(100, 0, 20)
+  error = rnorm(100, 0, 5)
+  y = 2 + 3*x + error
+  fake = data.frame(x, y)
+  x_sims = stan_glm(y ~ x, data = fake, refresh = 0)
+  b_hat = coef(x_sims)["x"]
+  b_se = se(x_sims)["x"]
+  a_hat = coef(x_sims)["(Intercept)"]
+  a_se = se(x_sims)["(Intercept)"]
+  ci = qt(0.975, 98)
+  ci_95[i] = abs(3 - b_hat) < ci*b_se
+}
+
+#making sure that the coefficient estimates are approximately unbiased
+b_hat = coef(x_sims)["x"]
+b_se = se(x_sims)["x"]
+
+cover_68 = abs(3 - b_hat) < b_se
+cover_68
+cover_95 = abs(3 - b_hat) < 2*b_se
+cover_95
+
+cover_68 = abs(2 - a_hat) < a_se
+cover_68
+cover_95 = abs(2 - a_hat) < 2*a_se
+cover_95
+
+cat("My intercept estimate is", coef(x_sims)[1], "and my x estimate is", coef(x_sims)[2], ", so these are approximately unbiased, especially considering they fall within one and two SEs of the true slope and intercept values.")
+
+#making sure that the standard deviations in the sampling distribution are approximately equal to their standard errors
+matrix = as.matrix(x_sims)
+mad_sd_x = apply(matrix, 2, mad)
+
+print(a_se)
+print(b_se)
+print(mad_sd_x)
+
+cat("As you can see, the standard errors and standard deviations of the intercept and slope are just about equal to each other.")
+
+#making sure that approximately 95% of the estimate +/- 2 SE intervals contain the true parameter values
+probability = mean(ci_95)
+
+cat("Approximately", probability*100, "percent of the estimate plus or minus two standard error intervals contain the true parameter values.")
+
+```
+
+Question 3: (6.2, 6.3, and 6.4)
+```{r}
+
+#6.2
+regression = function(a, b, n, sigma){
+  
+  x = runif(n, 0, 20)
+  error = rnorm(n, 0, sigma)
+  y = a + b*x + error
+  df = data.frame(x, y)
+  lm = stan_glm(y ~ x, data = df, refresh = 0)
+  plot(x, y, data = df)
+  abline(coef(lm)[1], coef(lm)[2])
+  return(lm)
+}
+
+test = regression(15, 35, 5, 20)
+print(test)
+estimate = coef(test)[2]
+estimate
+intercept = coef(test)[1]
+intercept
+
+#6.3
+test1 = regression(15, 35, 100, 20)
+print(test1)
+estimate1 = coef(test1)[2]
+estimate1
+intercept1 = coef(test1)[1]
+intercept1
+
+test2 = regression(15, 35, 500, 20)
+print(test2)
+estimate2 = coef(test2)[2]
+estimate2
+intercept2 = coef(test2)[1]
+intercept2
+
+test3 = regression(15, 35, 1000, 20)
+print(test3)
+estimate3 = coef(test3)[2]
+estimate3
+intercept3 = coef(test3)[1]
+intercept3
+
+cat("As I increase the number of n, my estimates for the slope and intercept get closer to the population parameter, and the uncertainties get smaller.")
+
+#6.4
+
+regression1 = function(a, b, n, sigma){
+  
+  x = runif(n, 0, 20)
+  error = rnorm(n, 0, sigma)
+  y = a + b*x + error
+  df = data.frame(x, y)
+  lm = stan_glm(y ~ x, data = df, refresh = 0)
+}
+
+b_hat = rep(NA, 100)
+b_se = rep(NA, 100)
+intercept_hat = rep(NA, 100)
+intercept_se = rep(NA, 100)
+
+n = i*5
+
+for (i in 1:100){
+  n[i] = i*5
+  results = regression1(3, 5, n, 20)
+  b_hat[i] = coef(results)[2]
+  b_se[i] = se(results)[2]
+  intercept_hat[i] = coef(results)[1]
+  intercept_se[i] = se(results)[1]
+  
+}
+
+df_1 = data.frame(n, b_hat, b_se, intercept_hat, intercept_se)
+
+library(ggplot2)
+
+#b1 estimates
+ggplot(data = df_1,
+       aes(x = n,
+           y = b_hat)) +
+  geom_point() +
+  geom_smooth() +
+  labs(x = "N",
+       y = "Beta1 Values",
+       title = "Beta1 Values with Increasing Values of N")
+
+ggplot(data = df_1,
+       aes(x = n,
+           y = b_se)) +
+  geom_point() +
+  geom_smooth() +
+  labs(x = "N",
+       y = "Beta1 SE Values",
+       title = "Beta1 SE Values with Increasing Values of N")
+
+ggplot(data = df_1,
+       aes(x = n,
+           y = intercept_hat)) +
+  geom_point() +
+  geom_smooth() +
+  labs(x = "N",
+       y = "Beta0 Values",
+       title = "Beta0 Values with Increasing Values of N")
+
+ggplot(data = df_1,
+       aes(x = n,
+           y = intercept_se)) +
+  geom_point() +
+  geom_smooth() +
+  labs(x = "N",
+       y = "Beta0 SE Values",
+       title = "Beta0 SE Values with Increasing Values of N")
+```
+
+Question 4: (9.3a and b)
+```{r}
+incumbent = read.csv("/Users/kap237/Box/PERSONAL WORK/POLI 428/ElectionsLEI.csv")
+fit = stan_glm(IncumbentVote ~ LEI, data = incumbent, refresh = 0)
+
+plot(incumbent$LEI, incumbent$IncumbentVote, xlab = "LEI", ylab = "Incumbent Vote (%)")
+a_hat = coef(fit)[1]
+b_hat = coef(fit)[2]
+abline(a_hat, b_hat)
+
+print(fit)
+cat("The regression coefficient", b_hat, "indicates that, when comparing two similar incumbents with different LEIs, an incumbent with an additional unit of the LEI index during his time in office has, on average,", b_hat, "percent more of a vote share than an incumbent with one unit less.")
+
+biden = a_hat + b_hat*(-0.45)
+cat("Biden's predicted share of votes in the two-party vote for 2024 is", biden)
+
+#9.3a
+#point prediction (by hand)
+new = data.frame(LEI = -0.45)
+biden_pointpred_hand = a_hat + b_hat*as.numeric(new)
+biden_pointpred_hand
+
+#linear predictor
+fit_matrix = as.matrix(fit)
+a_hat1 = fit_matrix[, 1]
+b_hat1 = fit_matrix[, 2]
+biden_linpred_hand = a_hat1 + b_hat1*as.numeric(new)
+summary(biden_linpred_hand)
+mad(biden_linpred_hand)
+quantile(biden_linpred_hand, c(0.025, 0.975))
+
+#predictive distribution (by hand)
+n_fit = nrow(fit_matrix)
+sigma = fit_matrix[, 3]
+biden_predict_hand = a_hat1 + b_hat1*as.numeric(new) + rnorm(n_fit, 0, sigma)
+summary(biden_predict_hand)
+mad(biden_predict_hand)
+quantile(biden_predict_hand, c(0.025, 0.975))
+
+
+#9.3b
+#point prediction (code)
+biden_pointpred = predict(fit, newdata = new)
+biden_pointpred
+
+#linear predictor (code)
+biden_linpred = posterior_linpred(fit, newdata = new)
+summary(biden_linpred)
+mad(biden_linpred)
+quantile(biden_linpred, c(0.025, 0.975))
+
+#predictive distribution (code)
+biden_predict = posterior_predict(fit, newdata = new)
+summary(biden_predict)
+mad(biden_predict)
+quantile(biden_predict, c(0.025, 0.975))
+
+#washington post
+cat("The best prediction for Biden's vote share, considering the current LEI index is at -0.45, would be a vote share of 44.25%. I obtained this number by substituting the specific LEI value in a simple linear regression model designed to output vote share for incumbents given the current LEI. This number has been checked using a linear predictor, which predicts the conditional mean value of the unobserved vote share corresponding to the given LEI level. It also has been verified using a predictive distribution, which estimates a spread of predictions for the vote share given the current LEI. Although we don't currently know Biden's vote share for 2024, using the current LEI of 2024 as well as the prior information we have about the distribution of vote shares based on LEI scores, we can predict his vote share anyways.")
+
+```
+
+Sources:
+https://mc-stan.org/rstanarm/reference/stan_glm.html
+https://mc-stan.org/rstanarm/articles/priors.html
+https://mc-stan.org/rstanarm/reference/posterior_interval.stanreg.html
+I verified my answers with Vanessa and Shari for each problem in this problem set, and I made changes to my code for question 3 based on Vanessa's code. I did not, however, copy her code.

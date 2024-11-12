@@ -1,0 +1,559 @@
+---
+title: "Midterm"
+author: "Kendra Pinegar"
+date: "2024-02-21"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 1:
+```{r}
+
+library(rstanarm)
+fertility = read.csv("/Users/BYU Rental/Box/PERSONAL WORK/POLI 428/fertility.csv")
+
+table(fertility$kids)
+hist(fertility$kids)
+
+table(fertility$educ)
+hist(fertility$educ)
+
+#I am transforming education into a categorical variable to see more clear divisions between incompleted and completed levels of education in ranked order.
+fertility$educ_cat[fertility$educ < 12] = 0
+fertility$educ_cat[fertility$educ == 12] = 1
+fertility$educ_cat[fertility$educ > 12 & fertility$educ < 16] = 2
+fertility$educ_cat[fertility$educ == 16] = 3
+fertility$educ_cat[fertility$educ > 16 & fertility$educ < 20] = 4
+fertility$educ_cat[fertility$educ == 20] = 5
+
+fertility$educ_cat = factor(fertility$educ_cat, labels = c("High School Incomplete", "High School Complete", "Undergraduate Incomplete", "Undergraduate Complete", "Graduate Incomplete", "Graduate Complete"))
+fertility$educ_cat = relevel(fertility$educ_cat, ref = "High School Complete")
+
+table(fertility$meduc)
+hist(fertility$meduc)
+
+table(fertility$feduc)
+hist(fertility$feduc)
+
+table(fertility$age) #I am centering this at the middle
+hist(fertility$age)
+fertility$age_m = fertility$age - median(fertility$age)
+hist(fertility$age_m)
+
+library(ggplot2)
+ggplot(data = fertility,
+       aes(x = age_m,
+           y = kids)) +
+  geom_point() +
+  geom_smooth()
+
+#There's curve to the plot, so I'm adding a squared term here
+
+fertility$age_sq = fertility$age^2
+fertility$age_sq_m = fertility$age_sq - median(fertility$age_sq)
+
+table(fertility$black)
+hist(fertility$black)
+
+table(fertility$region)
+hist(fertility$region)
+
+fertility$region = factor(fertility$region, labels = c("South", "East", "North-Central", "West"))
+
+table(fertility$year)
+hist(fertility$year)
+
+
+#This is a count variable, which means I can try the poisson model or negative binomial model, depending on the dispersion of the dependent variable
+sqrt(mean(fertility$kids))
+sd(fertility$kids)
+#The square root of the mean and the standard deviation are pretty equivalent, meaning the data isn't overdispersed; this means that I can work with the poisson mode
+
+#I am running the regression using both the continuous and categorical education variable; I will show later that they don't necessarily have a significant difference in comparing regression coefficients, but I prefer the visualization to be categorical
+fit = stan_glm(kids ~ educ + year + meduc + feduc + age_m + black + region, family = poisson, data = fertility, refresh = 0)
+print(fit, digits = 3)
+
+fit_1 = stan_glm(kids ~ educ_cat + year + meduc + feduc + age_m + age_sq_m + black + region, family = poisson, data = fertility, refresh = 0)
+print(fit_1, digits = 3)
+#I don't make feduc and meduc into categorical variables because the variables overall are insignificant in the model, so breaking it into categorical variables doesn't change the lack of significance
+
+#I'm calculating these to demonstrate that the poisson model better fits the data
+fit_2 = stan_glm(kids ~ educ + year + meduc + feduc + age_m + black + region, data = fertility, refresh = 0)
+
+fit_3 = stan_glm(kids ~ educ_cat + year + meduc + feduc + age_m + black + region, family = neg_binomial_2, data = fertility, refresh = 0)
+
+#loo
+loo = loo(fit)
+loo
+loo1 = loo(fit_1)
+loo1
+loo_compare(loo, loo1)
+#The p_loo estimate for the model "fit_1", almost accurately predicts the number of parameters in the model (there are 9.6 predicted, there are actually 8). The p_loo estimate for fit is a little less accurate, but as I mentioned above, there is no substantive difference between the two models, but educ_cat allows me to specifically isolate the comparison of undergraduate completed to high school completed, which is easier for others to visualize as well.
+
+loo2 = loo(fit_2)
+loo3 = loo(fit_3)
+loo_compare(loo, loo1, loo2, loo3)
+#The models fit and fit_1 (which were modeled using poisson) show a better fit for the data than the other models (a negative binomial model and a linear regression model), since the se_diff values times 2 are not greater than their respective p_loo estimates.
+
+plot(predict(fit_3), residuals(fit_3))
+#The plot shows that the residuals have a constant spread, which is what a poisson model calls for
+
+cases_fertility = data.frame(educ_cat = c("High School Complete", "Undergraduate Complete", "High School Complete", "High School Complete", "High School Complete", "High School Complete", "High School Complete", "High School Complete", "High School Complete", "High School Complete"),
+                   black = c(0, 0, 1, 0, 0, 0, 0, 0, 0, 0),
+                   age_m = c(0, 0, 0, 1, 0, 0, 0, 0, 0, 0),
+                   age_sq_m = c(0, 0, 0, 87, 0, 0, 0, 0, 0, 0),
+                   meduc = c(8, 8, 8, 8, 9, 8, 8, 8, 8, 8),
+                   feduc = c(10, 10, 10, 10, 10, 11, 10, 10, 10, 10),
+                   region = c("South", "South", "South", "South", "South", "South", "East", "North-Central", "West", "South"),
+                   year = c(78, 78, 78, 78, 78, 78, 78, 78, 78, 80))
+row.names(cases_fertility) = c("base", "undergrad", "black", "age", "mother educ", "father educ", "east", "north-central", "west", "year")
+
+subeff_fertility_predict = predict(fit_1, type = "response", newdata = cases_fertility)
+subeff_fertility_predict
+
+subeff_fertility_predictions = posterior_epred(fit_1, newdata = cases_fertility)
+subeff_fertility = data.frame(subeff_fertility_predictions)
+
+mean(subeff_fertility$undergrad - subeff_fertility$base)
+mean(subeff_fertility$black - subeff_fertility$base)
+mean(subeff_fertility$age - subeff_fertility$base)
+mean(subeff_fertility$mother.educ - subeff_fertility$base)
+mean(subeff_fertility$father.educ - subeff_fertility$base)
+mean(subeff_fertility$north.central - subeff_fertility$base)
+mean(subeff_fertility$east - subeff_fertility$base)
+mean(subeff_fertility$west - subeff_fertility$base)
+mean(subeff_fertility$year - subeff_fertility$base)
+
+ci_undergrad = quantile(subeff_fertility$undergrad - subeff_fertility$base, c(0.025, 0.975))
+ci_undergrad
+ci_black = quantile(subeff_fertility$black - subeff_fertility$base, c(0.025, 0.975))
+ci_black
+ci_age = quantile(subeff_fertility$age - subeff_fertility$base, c(0.025, 0.975))
+ci_age
+ci_meduc = quantile(subeff_fertility$mother.educ - subeff_fertility$base, c(.025, 0.975))
+ci_meduc
+ci_feduc = quantile(subeff_fertility$father.educ - subeff_fertility$base, c(.025, 0.975))
+ci_feduc
+ci_northcentral = quantile(subeff_fertility$north.central - subeff_fertility$base, c(.025, 0.975))
+ci_northcentral
+ci_east = quantile(subeff_fertility$east - subeff_fertility$base, c(.025, 0.975))
+ci_east
+ci_west = quantile(subeff_fertility$west - subeff_fertility$base, c(.025, 0.975))
+ci_west
+ci_year = quantile(subeff_fertility$year - subeff_fertility$base, c(0.025, 0.975))
+ci_year
+#I centered all of the continuous/ordinal variables because there were a few in which 0 did not exist in the data set and is not coherently interpreted in this context (like year, age, etc.)
+
+cat("As predicted by the model, women who completed undergraduate studies, in comparison to women who complete only high school, have, on average,", abs(coef(fit_1)[4]), "less children than do women who complete only high school. This coefficient is significant, given that its standard error times two,", 2* se(fit_1)[4], "is less than the coefficient of the model.
+In terms of other variables that influence the number of kids that women have, women who are black have, on average", coef(fit_1)[12], "more children than women who are not black, and this coefficient is significant, given that its standard error times two,", 2*se(fit_1)[12], "is less than the coefficient of the model.
+Women who are one year older initially have, on average,", coef(fit_1[10]), "more children than woman who are one year younger, but at a certain point, this changes, and a woman who is one year older has, on average,", abs(coef(fit_1)[11]), "less children than a woman who is one year younger. These coefficients are significant, given that their respective standard errors times two,", 2*se(fit_1)[1], "and", 2*se(fit_1)[11], "are both less than their respective coefficients of the model.
+Women who live in the north-central region of the United States have, on average,", coef(fit_1)[14], "more children than women who live in the south region of the United States, and this coefficient is significant, given that its standard error times two,", 2*se(fit_1)[14], "is less than the coefficient of the model.
+Finally, women who were surveyed one year later have, on average,", abs(coef(fit_1)[7]), "less children than women who were surveyed one year earlier, and this coefficient is significant, given that its standard error times two,", 2*se(fit_1)[7], "is less than the coefficient of the model.")
+
+cat("In summary, this policy that would establish a program to encourage high school graduates to go to college would likely decrease fertility, given that some women would terminate their education after a college degree rather than after a high school degree, and women who have college degrees have, on average, less children than women who have high school degrees. In this situation, the more highly educated a woman is, the less likely she is to have kids")
+
+#The sources I referenced:
+#https://stats.oarc.ucla.edu/r/dae/poisson-regression/
+#https://www.ucd.ie/ecomodel/Resources/QQplots_WebVersion.html#:~:text=On%20a%20Q%2DQ%20plot%20normally,deviate%20from%20the%20straight%20line)
+#https://stats.stackexchange.com/questions/99052/residuals-in-poisson-regression
+```
+
+### Question 2:
+```{r}
+library(foreign)
+sc = read.dta("/Users/BYU Rental/Box/PERSONAL WORK/POLI 428/rightwar.dta")
+
+table(sc$dir)
+hist(sc$dir)
+#I am going to reverse this so that 0 = liberal and 1 = conservative because that is more intuitive if we're focusing on how likely the SC is to constrain rights
+sc$dir[sc$dir == 1] = 3
+sc$dir[sc$dir == 0] = 4
+sc$dir[sc$dir == 3] = 0
+sc$dir[sc$dir == 4] = 1
+
+table(sc$war)
+hist(sc$war)
+
+table(sc$warcase)
+hist(sc$warcase)
+
+table(sc$lctdir)
+hist(sc$lctdir)
+#I should probably change this direction as well so that it matches the dir variable; from now on, a 0 for both lctdir and dir means a liberal decision, and a 1 for both lctdir and dir means a conservative decision 
+sc$lctdir[sc$lctdir == 1] = 3
+sc$lctdir[sc$lctdir == 0] = 4
+sc$lctdir[sc$lctdir == 3] = 0
+sc$lctdir[sc$lctdir == 4] = 1
+
+table(sc$nyt)
+hist(sc$nyt)
+
+table(sc$bef75)
+hist(sc$bef75)
+
+table(sc$scm)
+hist(sc$scm)
+#I'm going to make this on a scale of 0 to 1 because then we can see a change from very conservative to very liberal in future predictions
+sc$scm[sc$scm == 0] = 0/1.25
+sc$scm[sc$scm == 0.16] = 0.16/1.25
+sc$scm[sc$scm == 0.23] = 0.23/1.25
+sc$scm[sc$scm == 0.95] = 0.95/1.25
+sc$scm[sc$scm == 0.955] = 0.955/1.25
+sc$scm[sc$scm == 0.96] = 0.96/1.25
+sc$scm[sc$scm == 1] = 1/1.25
+sc$scm[sc$scm == 1.105] = 1.105/1.25
+sc$scm[sc$scm == 1.125] = 1.125/1.25
+sc$scm[sc$scm == 1.25] = 1.25/1.25
+
+
+fit_4 = stan_glm(dir ~ war*scm + warcase + lctdir + nyt + bef75, family = binomial(link = "logit"), data = sc, refresh = 0)
+print(fit_4, digits = 3)
+
+cat("The following variables have the greatest influence on the probability of the Supreme Court curtailing civil liberties and rights: war, scm (supreme court justice ideology), lctdir (the direction of the lower court decision), and nyt (whether the case was reported on the front page of the NYT).")
+
+cat("Specifically, when comparing a period of time in which the United States is not in war to a period of time in which the United States is in war when the Supreme Court Justice ideology score of the median justice is 0 (very conservative) and all else is held constant, the Supreme Court is more likely to curtail civil rights in the latter scenario, since the logged odds ratio", coef(fit_4)[2], "is positive. This relationship is significant because the logged odds ratio is greater than two times the standard error of the ratio,", 2*se(fit_4)[2])
+
+cat("When comparing the median Supreme Court Justice ideology, where one has a score of 0 (very conservative) and one has a score of 1 (very liberal), and when the United States is not in war and while holding all else constant, the Supreme Court is less likely to curtail civil rights in the latter scenario, since the logged odds ratio", coef(fit_4)[3], "is negative. This relationship is significant because the logged odds ratio is greater than two times the standard error of the ratio,", 2*se(fit_4)[3])
+
+cat("When looking at the interaction term, we see two possible outcomes that are both significant; when comparing the median Supreme Court Justice ideology, where one has a score of 0 (very conservative) and one has a score of 1 (very liberal), and when the United States is in war and while holding all else constant, the Supreme Court is less likely to curtail civil rights in the latter scenario, since the summed logged odds ratio for the scm variable and the interaction effect", coef(fit_4)[3]+coef(fit_4)[8], "is negative. This relationship is significant because the logged odds ratio for the interaction coefficient", coef(fit_4)[8], "is greater than two times the standard error of the ratio,", 2*se(fit_4)[8], ". Additionally, when comparing a period of time in which the United States is not in war to a period of time in which the United States is in war when the Supreme Court Justice median ideology score increases by 1 from very conservative to very liberal and while holding all else constant, the Supreme Court is less likely to curtail civil rights in the latter scenario, since the summed logged odds ratio for the war variable and the interaction effect", coef(fit_4)[2]+coef(fit_4)[8], "is negative This relationship is significant because the logged odds ratio for the interaction coefficient", coef(fit_4)[8], "is greater than two times the standard error of the ratio,", 2*se(fit_4)[8])
+
+cat("When comparing a case in which the lower court made a liberal decisions and a case in which the lower court made a conservative decision, while holding all else constant, the Supreme Court is less likely to curtail civil liberties in the latter scenario, since the logged odds ratio", coef(fit_4)[5], "is negative. This relationship is significant because the logged odds ratio is greater than two times the standard error of the ratio,", 2*se(fit_4)[5])
+
+cat("When comparing a case that didn't appear on the front page of the NYT and a case that did appear on the front page of the NYT, while holding all else constant, the Supreme Court is less likely to curtail civil rights (at least in comparison to the constant, as I mentioned above), since the logged odds ratio", coef(fit_4)[6], "is negative. This relationship is significant because the logged odds ratio is greater than two times the standard error of the ratio,", 2*se(fit_4)[6])
+
+cat("The other variables do not have logged odds ratios that are greater than two times the standard error, so these are the variables that are most influential on the relationship between periods of war and the Supreme Court curtailing civil liberties and rights.")
+
+#predictions
+#fit_4
+new_scm = data.frame(war = c(0, 1, 0, 1, 0, 0, 0, 0),
+                 warcase = c(0, 0, 0, 0, 1, 0, 0, 0),
+                 lctdir = c(0, 0, 0, 0, 0, 1, 0, 0),
+                 nyt = c(0, 0, 0, 0, 0, 0, 1, 0),
+                 bef75 = c(0, 0, 0, 0, 0, 0, 0, 1),
+                 scm = c(0, 0, 1, 1, 0, 0, 0, 0))
+row.names(new_scm) = c("base", "war conservative", "no war liberal", "war liberal", "warcase", "lctdir", "nyt", "bef75")
+
+point_predict = predict(fit_4, newdata = new_scm, type = "response")
+point_predict
+
+predict_scm = posterior_epred(fit_4, newdata = new_scm, type = "response")
+subeff_scm = data.frame(predict_scm)
+
+#interaction war*scm
+war_scm = mean(subeff_scm$war.liberal - subeff_scm$war.conservative)
+war_scm_ci = quantile(subeff_scm$war.liberal - subeff_scm$war.conservative, c(0.025, 0.975))
+#significant
+
+#war
+war = mean(subeff_scm$war.conservative - subeff_scm$base)
+war_ci = quantile(subeff_scm$war.conservative - subeff_scm$base, c(0.025, 0.975))
+#significant
+
+#scm
+scm = mean(subeff_scm$no.war.liberal - subeff_scm$base)
+scm_ci = quantile(subeff_scm$no.war.liberal - subeff_scm$base, c(0.025, 0.975))
+#significant
+
+#warcase
+mean(subeff_scm$warcase - subeff_scm$base)
+quantile(subeff_scm$warcase - subeff_scm$base, c(0.025, 0.975))
+#not significant
+
+#lctdir
+lctdir = mean(subeff_scm$lctdir - subeff_scm$base)
+lctdir_ci = quantile(subeff_scm$lctdir - subeff_scm$base, c(0.025, 0.975))
+#significant
+
+#nyt
+nyt = mean(subeff_scm$nyt - subeff_scm$base)
+nyt_ci = quantile(subeff_scm$nyt - subeff_scm$base, c(0.025, 0.975))
+#significant
+
+#bef75
+mean(subeff_scm$bef75 - subeff_scm$base)
+quantile(subeff_scm$bef75 - subeff_scm$base, c(0.025, 0.975))
+#not significant
+
+cat("As discussed above, the same pattern appears here in terms of which variables have a significant influence on the probability of the Supreme Court curtailing civil liberties and rights. Here I discuss the differences in probability that appear.")
+
+cat("When comparing a period of time in which the United States is not in war to a period of time in which the United States is in war when the Supreme Court Justice ideology score of the median justice is 0 (very conservative) and all else is held constant, the difference between the former and latter is", war, ", indicating that the latter scenario has a higher probability that the Supreme Court will curtail civil liberties. The 95% confidence interval of this difference is", war_ci, "and doesn't include 0, which indicates that the difference between the two scenarios is significant.")
+
+cat("When comparing the median Supreme Court Justice ideology, where one has a score of 0 (very conservative) and one has a score of 1 (very liberal), and when the United States is not in war and while holding all else constant, the difference between the former and latter is", scm, ", indicating that the latter scenario has a lower probability that the Supreme Court will curtail civil liberties. The 95% confidence interval of this difference is", scm_ci, "and doesn't include 0, which indicates that the difference between the two scenarios is significant.")
+
+cat("When comparing the median Supreme Court Justice ideology, where one has a score of 0 (very conservative) and one has a score of 1 (very liberal), and when the United States is in war and while holding all else constant, the difference between the former and latter is", war_scm, ", indicating that the latter scenario has a lower probability that the Supreme Court will curtail civil liberties. The 95% confidence interval of this difference is", war_scm_ci, "and doesn't include 0, which indicates that the difference between the two scenarios is significant.")
+
+cat("When comparing a case in which the lower court made a liberal decisions and a case in which the lower court made a conservative decision, while holding all else constant, the difference between the former and latter is", lctdir, ", indicating that the latter scenario has a lower probability that the Supreme Court will curtail civil liberties. The 95% confidence interval of this difference is", lctdir_ci, "and doesn't include 0, which indicates that the difference between the two scenarios is significant.")
+
+cat("When comparing a case that didn't appear on the front page of the NYT and a case that did appear on the front page of the NYT, while holding all else constant, the difference between the former and latter is", nyt, ", indicating that the latter scenario has a lower probability that the Supreme Court will curtail civil liberties. The 95% confidence interval of this difference is", nyt_ci, "and doesn't include 0, which indicates that the difference between the two scenarios is significant.")
+
+#keep 4 and 5
+loo4 = loo(fit_4)
+loo4
+#This is a good model because the p_loo estimate accurately estimates the real number of parameters I included in the model
+
+#error rate
+predict_4 = predict(fit_4)
+error_null_4 = mean(round(abs(sc$dir - mean(predict_4))))
+error_null_4
+
+error_rate_4 = mean((predict_4 > 0.5 & sc$dir == 0) | (predict_4 < 0.5 & sc$dir == 1))
+error_rate_4
+#In comparison to the error rate of the null model, the model I created has a much smaller error rate, which can give us further confidence in the accuracy of this model to predict whether the United States Supreme Court curtails rights when its at war
+cat("The null model error rate is", error_null_4, "whereas the interaction between war and SCJ ideology model error rate is", error_rate_4)
+
+cat("As I discussed above, the United States curtails rights and liberties more when the nation is at war, and the difference between the probabilities of the two scenarios is statistically significant. I also demonstrated that the probability of whether the Supreme Court will curtail rights and liberties during times of war depends greatly upon the ideology score of the median Supreme Court Justice, since the probability that the Supreme Court will curtail rights and liberties during a time of war is", point_predict[2], "when the median Supreme Court Justice ideology score is 0 (very conservative, but the probability that the Supreme Court will curtail rights and liberties during a time of war is only", point_predict[4], "when the median Supreme Court Justice ideology score is 1 (very liberal), and there is a statistical significance between these two probabilities, indicating that the likelihood that the Supreme Court curtails rights during war is heavily dependent on the median ideology score of the Supreme Court.")
+
+new_warcase = data.frame(war = c(0, 1),
+                         scm = c(0, 0),
+                         warcase = c(1, 1),
+                         lctdir = c(0, 0),
+                         nyt = c(0, 0),
+                         bef75 = c(0, 0))
+row.names(new_warcase) = c("no war", "war")
+
+predict_warcase = posterior_epred(fit_4, newdata = new_warcase, type = "response")
+subeff_warcase = data.frame(predict_warcase)
+
+warcase = mean(subeff_warcase$war - subeff_warcase$no.war)
+warcase_ci = quantile(subeff_warcase$war - subeff_warcase$no.war, c(0.025, 0.975))
+
+cat("War status does appear to influence war cases differently than other cases; when comparing a war case not during a time of war to a war case during a time of war, while holding all else constant, the difference between the former and latter scenario is", warcase, ", indicating that the latter scenario has a higher probability that the Supreme Court will curtail civil liberties and rights. The 95% confidence interval of this difference is", warcase_ci, "and doesn't include 0, which indicates that the difference between the two scenarios is significant. This means that war status does have a significant influence on war cases, leading the Supreme Court to be more likely to curtail civil rights and liberties.")
+
+#I transformed the lctdir and scm variables, so I substitute the values I've been using into this problem
+cases_rahimi = data.frame(war = c(0, 0, 1),
+                          scm = c(0, 0.128, 0.128),
+                          warcase = c(0, 0, 0),
+                          lctdir = c(1, 1, 1),
+                          nyt = c(0, 0, 0),
+                          bef75 = c(0, 0, 0))
+row.names(cases_rahimi) = c("base", "not war", "war")
+
+outcome_4 = posterior_epred(fit_4, type = "response", newdata = cases_rahimi)
+outcome_4 = data.frame(outcome_4)
+
+iran_war = mean(outcome_4$war - outcome_4$base)
+iran_war_ci = quantile(outcome_4$war - outcome_4$base, c(0.025, 0.975))
+
+iran_not_war = mean(outcome_4$not.war - outcome_4$base)
+iran_not_war_ci = quantile(outcome_4$not.war - outcome_4$base, c(0.025, 0.975))
+
+mean(outcome_4$base)
+mean(outcome_4$not.war)
+mean(outcome_4$war)
+
+cat("If the US is considered to be in a war with the Iranian-backed groups in Iraq, Yemen, and Syria, in comparison to the baseline scenario (which includes the US not being at war, a median Supreme Court Justice ideology score of 0, a conservative lower court decision, etc.), the difference between the two scenarios is", iran_war, ", indicating that the former scenario has a lower probability of curtailing civil rights. The 95% confidence interval of the difference is", iran_war_ci, "and doesn't contain 0, so this relationship is statistically significant.")
+
+cat("If the US is not considered to be in a war with the aforementioned groups, in comparison to the baseline scenario (which includes the US still not being considered in war, a median Supreme Court Justice ideology score of 0, a conservative lower court decision, etc.), the difference between the two scenarios is", iran_not_war, ", indicating that the former scenario has a lower probability of curtailing civil rights. The 95% confidence interval of this difference is", iran_not_war_ci, ", which doesn't contain 0 and is therefore statistically significant. Therefore, this relationship is statistically significant.")
+
+cat("Both scenarios, where the US is either in war or isn't in war, have significant influence, but they are opposing influences. If the US is at war, the Supreme Court is more likely to curtail civil rights and liberties. If the US is not at war, the Supreme Court is less likely to curtail civil rights, and comparatively, the US is more likely to curtail civil rights and liberties when comparing the two scenarios to each other instead of the baseline (with a difference of", mean(outcome_4$war - outcome_4$not.war), "and a confidence interval of", quantile(outcome_4$war - outcome_4$not.war, c(0.025, 0.975)), "that doesn't overlap with 0, indicating that both values are statistically significant and therefore valid interpretations of what the Supreme Court will do concerning civil rights.")
+
+cat("However, I predict that the Supreme Court will make a liberal decision (for Rahimi) because there is a greater probability over the baseline scenario has a probability that is less than 0.5, and even moreso less than 0.5 when the median Supreme Court Justice ideology is 0.16 (or my transformed 0.128). However, my prediction changes if the US is considered to be at war; if the US is war and the Supreme Court also believes this, then I predict that the Supreme court will make a conservative decision. I am confident in my prediction because the 95% confidence intervals show no overlap with 0 in the differences between probabilities.")
+```
+
+### Question 3:
+```{r}
+
+gpa = read.csv("/Users/BYU Rental/Box/PERSONAL WORK/POLI 428/gpa.csv")
+library(MASS)
+
+table(gpa$male)
+hist(gpa$male)
+
+table(gpa$colGPA)
+hist(gpa$colGPA)
+
+table(gpa$hsGPA)
+hist(gpa$hsGPA)
+
+table(gpa$ACT)
+hist(gpa$ACT)
+
+table(gpa$PC)
+hist(gpa$PC)
+
+table(gpa$bgfriend)
+hist(gpa$bgfriend)
+
+table(gpa$skipped)
+hist(gpa$skipped)
+
+table(gpa$alcohol)
+hist(gpa$alcohol)
+
+fit_13 = stan_glm(colGPA ~ ACT + hsGPA + male + PC + bgfriend + skipped + alcohol, data = gpa, refresh = 0)
+print(fit_13, digits = 3)
+cat("It appears that, when comparing ACT and high school GPA as predictors of college GPA, high school GPA is a better, or more significant predictor. When comparing a student who has a high school GPA one point lower and a student who has a high school GPA one point higher, the latter has, on average,", coef(fit_13)[3], "more GPA points in college. This result is statistically significant because the standard error of the regression coefficient,", se(fit_13)[3], "is not greater than the regression coefficient when multiplied by 2. However, when comparing a student who has an ACT score one point lower and a student who has an ACT score one point higher, the latter has, on average", coef(fit_13)[2], "more GPA points in college. This result, however, is not statistically significant because the standard error of the regression coefficient,", se(fit_13)[2], "is greater than the regression coefficient when multiplied by 2.")
+#It also appears that the following variables also have statistically significant effects on college GPA: PC (whether a student owns a PC or not), and skipped (the average number of lectures missed per week)
+cat("When comparing a student who doesn't own a personal computer and a student who does own a personal computer, the latter has, on average,", coef(fit_13)[5], "more GPA points in college. This result is statistically significant because the standard error multiplied by 2,", 2*se(fit_13)[5], "is less than the regression coefficient.
+Additionally, when comparing a student who misses, on average, one less lecture a week and a student who misses, on average, one more lecture a week, the latter has, on average,", abs(coef(fit_13)[7]), "less GPA points in college. This result is statistically significant because the standard error multiplied by 2,", 2*se(fit_13)[7], "is less than the regression coefficient.
+The other regression coefficients were not greater than 2 times their own standard errors, so they don't have a great influence on college GPA.")
+
+#Now I am going to calculate the "perfectly-measured ACT scores" by subtracting an increasing error term from the imperfectly-calculated ACT scores. In the case that imperfectly-measured ACT scores are skewing the data, it's possible that the ACT score regression coefficient could have a statistically significant coefficient, so I should test simulating perfectly-calculated data to see if there's any way to give ACT a statistically significant coefficient.
+
+#1
+gpa$perfect_ACT = rep(NA, 141)
+
+for (i in 1:141){
+  gpa$perfect_ACT[i] = gpa$ACT[i] - rnorm(141, 0, sd = 0.05)[i]
+  
+}
+
+perfect_ACT1 = stan_glm(colGPA ~ perfect_ACT + hsGPA + male + PC + bgfriend + skipped + alcohol, data = gpa, refresh = 0)
+print(perfect_ACT1, digits = 3)
+hist(gpa$perfect_ACT)
+
+#2
+gpa$perfect_ACT = rep(NA, 141)
+
+for (i in 1:141){
+  gpa$perfect_ACT[i] = gpa$ACT[i] - rnorm(141, 0, sd = 1)[i]
+  
+}
+
+perfect_ACT2 = stan_glm(colGPA ~ perfect_ACT + hsGPA + male + PC + bgfriend + skipped + alcohol, data = gpa, refresh = 0)
+print(perfect_ACT2, digits = 3)
+hist(gpa$perfect_ACT)
+
+#3
+gpa$perfect_ACT = rep(NA, 141)
+
+for (i in 1:141){
+  gpa$perfect_ACT[i] = gpa$ACT[i] - rnorm(141, 0, sd = 5)[i]
+  
+}
+
+perfect_ACT3 = stan_glm(colGPA ~ perfect_ACT + hsGPA + male + PC + bgfriend + skipped + alcohol, data = gpa, refresh = 0)
+print(perfect_ACT3, digits = 3)
+hist(gpa$perfect_ACT)
+
+#4
+gpa$perfect_ACT = rep(NA, 141)
+
+for (i in 1:141){
+  gpa$perfect_ACT[i] = gpa$ACT[i] - rnorm(141, 0, sd = 10)[i]
+  
+}
+
+perfect_ACT4 = stan_glm(colGPA ~ perfect_ACT + hsGPA + male + PC + bgfriend + skipped + alcohol, data = gpa, refresh = 0)
+print(perfect_ACT4, digits = 3)
+hist(gpa$perfect_ACT)
+
+#As you can see, with a great variety of error taken away from the imperfectly-calculated ACT score variable, the ACT score coefficient continues as insignificant. Varying the size of the error term does not affect the significance of the ACT score regression coefficient, meaning that students with ACT scores higher and lower by one point do not have significant differences in college GPAs. The effect size and significance of the ACT score coefficient is not erroneous because of the fact that ACT scores are imperfectly measured.
+
+library(cowplot)
+
+g1 = ggplot(data = gpa,
+       aes(x = ACT,
+           y = colGPA)) +
+  geom_point() +
+  geom_smooth(method = "lm",
+              formula = y ~ x)
+
+g2 = ggplot(data = gpa,
+       aes(x = perfect_ACT,
+           y = colGPA)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+plot_grid(g1, g2)
+#This is a graphical comparison of the model with the imperfectly-calculated ACT scores and the model with the ACT scores that were calculated by removing the largest amount of error from them. Any relationship that existed at all under the first model almost entirely disappears in the second model, indicating that error is perhaps not the factor that causes ACT to not have a significant effect in the model that predicts college GPA.
+
+loo13 = loo(fit_13)
+loo_p1 = loo(perfect_ACT1)
+loo_p2 = loo(perfect_ACT2)
+loo_p3 = loo(perfect_ACT3)
+loo_p4 = loo(perfect_ACT4)
+
+loo_compare(loo13, loo_p1, loo_p2, loo_p3, loo_p4)
+#In comparing p_loo values, we can see that each p_loo value accurately predicts that there are 8 parameters in each model (which there are). Additionally, as seen by the se_diff values, all of the p_loo values overlap with one another, indicating that none of the models that attempt to perfectly measure ACT scores does a better job at predicting college GPAs than does the model that uses the imperfectly-calculated ACT scores.
+
+#Here, I am comparing the distribution of residuals between the normal model with the imperfectly-calculated ACT scores and the perfectly-calculated ACT scores that I generated using simulations.
+par(mfrow = c(1,2))
+hist(residuals(fit_13))
+hist(residuals(perfect_ACT1))
+
+hist(residuals(fit_13))
+hist(residuals(perfect_ACT2))
+
+hist(residuals(fit_13))
+hist(residuals(perfect_ACT3))
+
+hist(residuals(fit_13))
+hist(residuals(perfect_ACT4))
+
+#As the error taken away from the simulated ACT score variable increases, the distribution of residuals for the model begins to look less and less like it is normally distributed, indicating that the latter models where larger error terms are removed from the simulated ACT scores are not predicting college GPAs correctly. There isn't a benefit to using the simulated ACT scores that remove error, since there is no difference to using that data (or if there is a difference, it's that the simulated ACT scores are worse than the imperfectly-calcualted ACT scores).
+
+cases_gpa = data.frame(hsGPA = c(2, 3, 2, 2, 2, 2, 2, 2),
+                       ACT = c(24, 24, 25, 24, 24, 24, 24, 24),
+                       male = c(0, 0, 0, 1, 0, 0, 0, 0),
+                       PC = c(0, 0, 0, 0, 1, 0, 0, 0),
+                       bgfriend = c(0, 0, 0, 0, 0, 1, 0, 0),
+                       skipped = c(0, 0, 0, 0, 0, 0, 1, 0),
+                       alcohol = c(0, 0, 0, 0, 0, 0, 0, 1))
+row.names(cases_gpa) = c("base", "hsgpa", "act", "male", "pc", "bgfriend", "skip", "alcohol")
+
+cases_gpa_perf = data.frame(hsGPA = c(2, 3, 2, 2, 2, 2, 2, 2),
+                       perfect_ACT = c(24, 24, 25, 24, 24, 24, 24, 24),
+                       male = c(0, 0, 0, 1, 0, 0, 0, 0),
+                       PC = c(0, 0, 0, 0, 1, 0, 0, 0),
+                       bgfriend = c(0, 0, 0, 0, 0, 1, 0, 0),
+                       skipped = c(0, 0, 0, 0, 0, 0, 1, 0),
+                       alcohol = c(0, 0, 0, 0, 0, 0, 0, 1))
+row.names(cases_gpa_perf) = c("base", "hsgpa", "act", "male", "pc", "bgfriend", "skip", "alcohol")
+
+#I picked a 2.0 as the baseline GPA because that is the median GPA of the possible values of a GPA
+
+gpa_predict = posterior_epred(fit_13, newdata = cases_gpa)
+subeff_gpa = data.frame(gpa_predict)
+
+gpa_predict_perf = posterior_epred(perfect_ACT1, newdata = cases_gpa_perf)
+subeff_gpa_perf = data.frame(gpa_predict_perf)
+
+mean(subeff_gpa$hsgpa - subeff_gpa$base)
+mean(subeff_gpa_perf$hsgpa - subeff_gpa_perf$base)
+quantile(subeff_gpa$hsgpa - subeff_gpa$base, c(0.025, 0.975))
+quantile(subeff_gpa_perf$hsgpa - subeff_gpa_perf$base, c(0.025, 0.975))
+
+mean(subeff_gpa$act - subeff_gpa$base)
+mean(subeff_gpa_perf$act - subeff_gpa_perf$base)
+quantile(subeff_gpa$act - subeff_gpa$base, c(0.025, 0.975))
+quantile(subeff_gpa_perf$act - subeff_gpa_perf$base, c(0.025, 0.975))
+
+mean(subeff_gpa$male - subeff_gpa$base)
+mean(subeff_gpa_perf$male - subeff_gpa_perf$base)
+quantile(subeff_gpa$male - subeff_gpa$base, c(0.025, 0.975))
+quantile(subeff_gpa_perf$male - subeff_gpa_perf$base, c(0.025, 0.975))
+
+mean(subeff_gpa$pc - subeff_gpa$base)
+mean(subeff_gpa_perf$pc - subeff_gpa_perf$base)
+quantile(subeff_gpa$pc - subeff_gpa$base, c(0.025, 0.975))
+quantile(subeff_gpa_perf$pc - subeff_gpa_perf$base, c(0.025, 0.975))
+
+mean(subeff_gpa$bgfriend - subeff_gpa$base)
+mean(subeff_gpa_perf$bgfriend - subeff_gpa_perf$base)
+quantile(subeff_gpa$bgfriend - subeff_gpa$base, c(0.025, 0.975))
+quantile(subeff_gpa_perf$bgfriend - subeff_gpa_perf$base, c(0.025, 0.975))
+
+mean(subeff_gpa$skip - subeff_gpa$base)
+mean(subeff_gpa_perf$skip - subeff_gpa_perf$base)
+quantile(subeff_gpa$skip - subeff_gpa$base, c(0.025, 0.975))
+quantile(subeff_gpa_perf$skip - subeff_gpa_perf$base, c(0.025, 0.975))
+
+mean(subeff_gpa$alcohol - subeff_gpa$base)
+mean(subeff_gpa_perf$alcohol - subeff_gpa_perf$base)
+quantile(subeff_gpa$alcohol - subeff_gpa$base, c(0.025, 0.975))
+quantile(subeff_gpa_perf$alcohol - subeff_gpa_perf$base, c(0.025, 0.975))
+
+#Not only do the substantive effects calculated here demonstrate no real difference between a model with a perfectly-calculated ACT score variable and an imperfectly-calculated ACT score variable, there seems to be no real difference between the baseline values and a high school GPA that is increased by 1 grade point, given that the 95% confidence intervals of the difference between the predicted values overlap with 0. This is most likely due to the nature of the data collected; the n size is only 141, which constrains the significance of the results, meaning that the substantive effects are more likely to predict that there is no significant difference between baseline outcomes and outcomes where the predictor variables vary.
+
+cat("In the setting of a college admissions committee, we are likely to only receive two of the predictors from our model, ACT scores and high school GPA. Given the results of models that used an imperfectly-calculated and perfectly-calculated ACT score variable, I would advise colleges to give greater weight to the high school GPA than the ACT scores. While the substantive effects calculated above might negate that, as I explained above, the smaller n size may explain why there doesn't appear to be any significant differences between two students with a one-point difference in high school GPA. However, upon reviewing the regression model, the regression coefficient of", coef(fit_13)[3], "is greater than two times the standard error", 2*se(fit_13)[3], "which means that we can recognize that when compariang a student with a high school GPA one point higher and a student with a high school GPA one point lower, the former has, on average,", coef(fit_13)[3], "points higher on his college GPA. This makes substantive sense because, while every student takes essentially the same GPA and not every school has the same GPA scale, students with higher high school GPAs can be students who studied hard to earn their high school GPA and will therefore study hard to earn their college GPA as well. Therefore, I would suggest giving high school GPAs more consideration over ACT scores.")
+
+#The sources I referenced:
+#http://www.sthda.com/english/articles/24-ggpubr-publication-ready-plots/81-ggplot2-easy-way-to-mix-multiple-graphs-on-the-same-page/
+```
+

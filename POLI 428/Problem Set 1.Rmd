@@ -1,0 +1,216 @@
+---
+title: "Problem Set 1"
+author: "Kendra Pinegar; Completion code: 4487"
+date: "2024-01-17"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Question 1: a (4.6a)
+```{r cars}
+
+girls <- c(.4777, .4875, .4859, .4754, .4874, .4864, .4813, .4787, .4895, .4797, .4876, .4859, .4857, .4907, .5010, .4903, .4860, .4911, .4871, .4725, .4822, .4870, .4823, .4973)
+
+sd_observed <- sd(girls)
+cat("The observed standard deviation is", sd_observed)
+
+mean(girls)
+
+sd_theoretical = sqrt(mean(girls)*(1-mean(girls))/3900)
+cat("The theoretical standard deviation for a constant probability over the 24-month period is", sd_theoretical)
+
+cat("The standard deviation of the proportions is 0.006 whereas the standard deviation of a constant probability over the 24-month period is 0.008.")
+```
+
+
+Question 1: b (4.6b)
+```{r}
+#equation for confidence interval: p +/- sqrt(p*(1-p)/n)
+
+#this is the chi-squared value?
+chi_h <- qchisq(.975, df = 23)
+chi_l <- qchisq(.025, df = 23)
+
+ci_l <- sqrt((23*(sd_observed^2))/chi_l)
+ci_h <- sqrt((23*(sd_observed^2))/chi_h)
+
+cat("The confidence interval is", "[",ci_h,",", ci_l,"]")
+print(ci_l)
+print(ci_h)
+
+cat("This is not significant because it includes the observed standard deviation (about 0.006) in its interval.")
+
+#I used these sources to understand chi-squared values because I have never learned about them before: https://makemeanalyst.com/statistics-with-r/chi-square-distribution-in-r/#:~:text=In%20R%2C%20the%20Chi%2DSquare,of%20the%20Chi%2DSquare%20distribution, https://www.milefoot.com/math/stat/ci-variances.htm
+```
+
+
+Question 2: (5.4)
+```{r}
+
+z <- rep(NA, 1000)
+
+for (i in 1:1000){
+  sample_z <- runif(20, min = 0, max = 1)
+  z[i] <- sum(sample_z)
+}
+
+
+hist(z, freq = FALSE, main = "Demonstration of the Central Limit Theorem")
+x <- seq(0, 15, by = 0.01)
+y <- dnorm(x, mean(z), sd(z))
+lines(x, y, lwd = 2)
+
+cat("While the density plot demonstrates a normal distribution, the histogram shows a little more variance in what the data demonstrates.")
+
+#I referred to Professor Goodliffe's updated class notes to understand how to layer a density plot on the histogram
+```
+
+
+Question 3: (5.2)
+```{r}
+
+total_weights <- rep(NA, 1000)
+
+for (i in 1:1000){
+  sex <- rbinom(10, 1, 0.5)
+  log_weight <- ifelse(sex == 1,
+         rnorm(10, 5.13, 0.17),
+         rnorm(10, 4.96, 0.2))
+  weight <- exp(log_weight)
+  total_weights[i] <- sum(weight)
+}
+
+exceeds_capacity <- sum(total_weights > 1750)
+
+probability_exceeds <- exceeds_capacity/1000
+cat("The probability that the weigt exceeds the capacity is", probability_exceeds)
+
+
+```
+
+
+Question 4: a (5.10a)
+```{r}
+library(ggplot2)
+
+cost_difference <- 600 + 400*rt(1000, 50)
+effectiveness_difference <- 3 + rt(1000, 100)
+
+cost_effectiveness <- data.frame(cost = cost_difference, effectiveness = effectiveness_difference)
+
+ggplot(data = cost_effectiveness,
+       aes(x = cost,
+           y = effectiveness)) +
+  geom_point() +
+  labs(x = "Difference in Cost",
+       y = "Difference in Effectiveness",
+       title = "Scatterplot of Differences in Cost and Effectiveness")
+
+
+```
+
+
+Question 4: b (5.10b)
+```{r}
+
+cost_effectiveness$ratio <- cost_effectiveness$cost/cost_effectiveness$effectiveness
+
+mean <- mean(cost_effectiveness$ratio)
+
+cat("The 50% confidence interval is", "[", quantile(cost_effectiveness$ratio, c(0.25, 0.75)), "]", "and the 95% confidence interval is", "[", quantile(cost_effectiveness$ratio, c(0.025, 0.975)), "]")
+
+
+#I used this website to learn how to use quantile to make producing CIs much easier (so I didn't have to use t-scores: https://www.digitalocean.com/community/tutorials/quantile-function-in-r
+```
+
+
+Question 4: c (5.10c)
+```{r}
+
+cost_difference <- 600 + 400*rt(1000, 50)
+effectiveness_difference <- 3 + 2*rt(1000, 100)
+
+cost_effectiveness <- data.frame(cost = cost_difference, effectiveness = effectiveness_difference)
+
+ggplot(data = cost_effectiveness,
+       aes(x = cost,
+           y = effectiveness)) +
+  geom_point() +
+  labs(x = "Difference in Cost",
+       y = "Difference in Effectiveness",
+       title = "Scatterplot of Differences in Cost and Effectiveness")
+
+cost_effectiveness <- data.frame(cost = cost_difference, effectiveness = effectiveness_difference)
+
+cost_effectiveness$ratio <- cost_effectiveness$cost/cost_effectiveness$effectiveness
+
+mean <- mean(cost_effectiveness$ratio)
+
+cat("The 50% confidence interval is", "[", quantile(cost_effectiveness$ratio, c(0.25, 0.75)), "]", "and the 95% confidence interval is", "[", quantile(cost_effectiveness$ratio, c(0.025, 0.975)), "]")
+
+```
+
+
+Question 5: a (5.1a)
+```{r}
+basketball <- function(){
+  
+  consecutive_misses <- 0
+  shots_taken <- 0
+  total_misses <- 0
+    while(consecutive_misses < 2){
+      shots <- rbinom(1, 1, 0.6)
+      if(shots == 1){
+        consecutive_misses <- 0
+      } else {
+        consecutive_misses <- consecutive_misses + 1
+        total_misses <- total_misses + 1
+      }
+      shots_taken <- shots_taken + 1
+    }
+  
+  list(shots_taken,
+       (shots_taken - total_misses)/shots_taken)
+}
+
+#I used this source to understand how to use the while code: https://campus.datacamp.com/courses/intermediate-r/chapter-2-loops?ex=1
+#I also consulted the textbook to understand how to use if and else commands within the context of while
+```
+
+
+Question 5: b (5.1b)
+```{r}
+
+taken_shots <- rep(NA, 1000)
+proportion <- rep(NA, 1000)
+
+for(i in 1:1000){
+  result <- basketball()
+  taken_shots[i] <- result[[1]]
+  proportion[i] <- result[[2]]
+}
+
+cat("The average of the total number of shots that the player takes is", mean(taken_shots))
+cat("The standard deviation of the total number of shots that the player takes is", sd(taken_shots))
+
+hist(taken_shots, xlab = "Number of Shots Taken", main = "Histogram of Shots Taken")
+
+```
+
+
+Question 5: c (5.1c)
+```{r}
+
+plot(taken_shots, proportion, xlab = "Number of Shots Taken", ylab = "Proportion of Shots that are Successes", main = "Comparison of Number of Shots Taken and Proportional Success")
+
+```
+
+```{r}
+cat("I gave credit to any electronic/textbook sources throughout the course of this problem set. I worked through every problem with Vanessa and Shari and compared answers with them. We did not copy each others' code.")
+```
+

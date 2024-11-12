@@ -1,0 +1,388 @@
+---
+title: "428 Final Exam"
+author: "Kendra Pinegar; Time code: 1803"
+date: "2024-04-17"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 1: What influences the vote in British election?
+```{r}
+library(haven)
+library(nnet)
+library(lme4)
+library(rstanarm)
+
+#load the data
+vote = read_dta("/Users/kap237/Box/PERSONAL WORK/POLI 428/Final/ukelections.dta")
+#give party variable party labels
+vote$party = factor(vote$party, labels = c("Conservative", "Labour", "Liberal"))
+vote$party = relevel(vote$party, ref = "Liberal")
+
+#experiment
+fit = multinom(party ~ male + age87 + manual + inflation + right, data = vote)
+summary(fit)
+
+vote$party = relevel(vote$party, ref = "Liberal")
+
+fit_b = glm(party ~ male + age87 + manual + inflation + right, data = vote, subset = (vote$party != "Labour"), family = binomial(link = "logit"))
+summary(fit_b)
+#for liberal -> conservative, increases in votes: being male, being older, having a manual worker father, having a lower perception of inflation, being more conservative
+
+vote$party = relevel(vote$party, ref = "Labour")
+
+fit_c = glm(party ~ male + age87 + manual + inflation + right, data = vote, subset = (vote$party != "Liberal"), family = binomial(link = "logit"))
+summary(fit_c)
+#for labour -> conservative, increases in votes: being male, being older, having a non-manual worker father, having a lower perception of inflation, being more conservative
+
+vote$party_b[vote$party == "Conservative"] = "Conservative"
+vote$party_b[vote$party == "Liberal"] = "Not Conservative"
+vote$party_b[vote$party == "Labour"] = "Not Conservative"
+vote$party_b = factor(vote$party_b, levels = c("Not Conservative", "Conservative"))
+vote$party_b = relevel(vote$party_b, ref = "Not Conservative")
+
+fit_1 = glm(party_b ~ constit + male + age87 + manual + inflation + right, family = binomial(link = "logit"), data = vote)
+summary(fit_1)
+
+fit_2 = glm(party_b ~ male + age87 + manual + inflation + right + factor(serialno) + factor(year), family = binomial(link = "logit"), data = vote)
+summary(fit_2)
+
+#male: less likely to vote for labour and liberal (GOOD INDICATOR)
+#age87: higher age, less likely to vote for labour and liberal
+#father manual worker: less likely to vote for liberal, more likely to work for labour (GOOD INDICATOR)
+#perceived inflation: more likely to vote for labour and liberal (GOOD INDICATOR)
+#right: less likely to vote for labour and liberal (GOOD INDICATOR)
+
+fit_3 = glmer(party_b ~ male + age87 + manual + inflation + right + (1 | serialno) + (1 | year) + (1 | constit), family = binomial(link = "logit"), data = vote)
+summary(fit_3)
+
+fit_3b = glmer(party_b ~ male + age87 + manual + inflation + right + (1 | occ) + (1 | constit), family = binomial(link = "logit"), data = vote)
+summary(fit_3b)
+
+fit_3c = glmer(party_b ~ male + age87 + manual + inflation + right + (1 | occ), family = binomial(link = "logit"), data = vote)
+summary(fit_3)
+
+#tests to figure out which model is better: fit_3 is best!
+anova(fit_3, fit_3b, fit_3c)
+anova(fit_3, fit_3b)
+
+par(mfrow = c(1, 2))
+hist(vote$male)
+hist(vote$male[vote$constit == 915])
+
+hist(vote$age87)
+hist(vote$age87[vote$constit == 915])
+
+hist(vote$manual)
+hist(vote$manual[vote$constit == 915])
+
+hist(vote$inflation)
+hist(vote$inflation[vote$constit == 915])
+mean(vote$inflation)
+mean(vote$inflation[vote$constit == 915])
+
+hist(vote$right)
+hist(vote$right[vote$constit == 915])
+mean(vote$right)
+mean(vote$right[vote$constit == 915])
+
+#This is the electoral situation of the Member in Constituency 915. According to the model I calculated above:
+    # - men are more likely than women to vote for a conservative candidate
+    # - older voters are more likely than younger voters to vote for a conservative candidate
+    # - voters who don't have a father in manual labor are more likely than voters who do have a
+      # father in manual labor to vote for a conservative candidate
+    # - voters who have a lower view of perceived inflation are more likely than voters who have
+      # a higher view of perceived inflation to vote for a conservative candidate
+    # - voters who have greater conservatism are more likely than voters who have less
+      # conservatism to vote for a conservative candidate.")
+
+#However, the Member of Constituency 915 has less male voters than female voters, especially in comparison to voters of all the constituencies. There are more younger voters than older voters, although this is not abnormal in comparison to voters of all constituencies. There are about an equal number of voters with and without fathers in manual labor, which is different in comparison to voters of all the constituencies, where there are often more voters with fathers who work in manual labor. There are more voters who believe that perceived inflation is greater after the election, which doesn't vary in comparison to voters in all the constituencies. Finally, there are more moderate voters (in terms of conservatism) in the Member's constituency, which isn't far off from all voters in the constituencies; however, the average level of conservatism in the Member's constituency is greater than the average among all constituencies.
+
+#If the Member wants more votes, he/she must do what he/she can to influence the manipulable variables of constituents. For example, variables like sex, age, and manual are not manipulable; the only thing that a Member can do to affect that is convince people with those kinds of demographics to move into the constituency boundaries. Instead, the Member should aim for informational events to demonstrate that inflation has not increased since the last election. Additionally, the Member can host events and work with constituents to see if this influences their level of conservatism. While the right variable is going to be harder to change, positive exposures to the conservative-party Member is more likely to make constituents feel more positively about conservatism and the conservative-party Member than anything else.
+```
+
+### Question 2: Does using a voucher encourage students to finish more years of school?
+```{r}
+library(ivreg)
+
+voucher = read.csv("/Users/kap237/Box/PERSONAL WORK/POLI 428/Final/voucher.csv")
+
+voucher = subset(voucher, !is.na(voucher$usedsch))
+#PACES qualifies as somewhat of an experiment in the sense that the treatment was randomized, and although participants did not have to use the voucher to send their students to private secondary school, assignment to the voucher is randomized, and we can use this variable itself as an instrument in order to determine if using the voucher affects the number of school years that students completed.
+
+#In order to justify the instrumentation of assignment, I demonstrate that the variable meets the four criteria necessary for heterogeneous treatment effects:
+
+#Instrument relevance (the instrument must be related to the independent variable):
+cor(voucher$usedsch, voucher$vouch0, use = "complete.obs") #there is a significantly correlation between the independent variable and instrumental variable.
+
+#Instrument exogeneity (the instrument is uncorrelated with the error term of the model, or it's considered independent/ignorable): we aren't necessarily able to prove this by way of a statistical test, but by recognizing that the assignment to the treatment was random, this means that the treatment assignment is independent of the outcome, even if uptake of the treatment isn't necessarily independent of the outcome variable. We should also take the assumptions of SUTVA into account here. The only possibility that stands out here about different versions of the treatment is if the surveys that were administered contained something different and thus primed students differently in their uptake of the private school voucher. I looked for another data set or information that would inform me as to whether this could be the case, but I could not find anything, so I will rule out the idea that there are hidden versions of the treatment that were distributed. It is highly unlikely that there is interference among students in being assigned to the voucher group; the likelihood of students being assigned to the treatment group did not vary with the selection of other students. There is no relationship there.
+
+#Exclusion restriction (the instrument is only related to the dependent variable by way of the independent variable):
+summary(lm(scyfnsh ~ vouch0, data = voucher), digits = 3) #the OLS relationship between the instrument, assignment to the voucher, and the dependent variable, the number of school years complete, is not statistically significant
+cor(voucher$vouch0, voucher$scyfnsh) #just to further demonstrate; even the correlation between the two variables is weak. This confirms that the instrumental variable is exclusive to the dependent variable by way of the independent variable.
+
+#Monotonicity (increasing the level of the instrument does not decrease the level of the treatment): theoretically, it makes virtually no sense to think that increasing the number of students who are offered the voucher would decrease the number of students that would take up the voucher and attend private secondary schooling. If anything, the relationship would probably be reverse, where an increase in the instrument would increase the number of students who use the voucher. The only slight violation here is that there are certainly students who attend the private secondary schooling without receiving the voucher. Overall, though, the instrument seems to pass this criteria.
+
+fit_ivreg = ivreg(scyfnsh ~ usedsch + age + sex2 + strata + djamundi + factor(month) | vouch0 + strata + age + sex2 + djamundi + strata + factor(month), data = voucher)
+summary(fit_ivreg)
+#This model would ideally fit the idea of an instrumental variable well enough; however, the number of years of school completed is a count variable, so I should use either a poisson model or negative binomial model to fit the data better. My choice in this depends on the dispersion of the data.
+
+sqrt(mean(voucher$scyfnsh))
+sd(voucher$scyfnsh)
+#There's actually underdispersion in the data here, because the variance in the response of Y is smaller than what the model assumes, so I am going to need to run a poisson model to account for the underdispersion of the data.
+
+parallel::detectCores()
+options(mc.cores = 12)
+
+voucher1 = stan_glm(scyfnsh ~ usedsch + age + sex2 + strata + djamundi + vouch0, family = poisson, data = voucher, refresh = 0, cores = 12)
+print(voucher1, digits = 3)
+
+voucher2 = stan_glm(scyfnsh ~ usedsch + age + sex2 + strata + djamundi + vouch0, family = neg_binomial_2, data = voucher, refresh = 0, cores = 12)
+print(voucher2, digits = 3)
+
+#Poisson model with instrumentation of voucher assignment
+stage1 = stan_glm(usedsch ~ vouch0, data = voucher, refresh = 0, cores = 12)
+print(stage1, digits = 3)
+voucher$usedsch_hat = predict(stage1)
+
+voucher_model = stan_glm(scyfnsh ~ usedsch_hat + age + sex2 + strata + djamundi + svy + factor(month), data = voucher, family = poisson, refresh = 0, cores = 12)
+print(voucher_model, digits = 3)
+
+#Ultimately, whether I run a poisson regression or a classic OLS model, the treatment itself is not effective, even under instrumentation of the assignment of the voucher. Unfortunately, the effect of PACES is not really substantial, and I cannot necessarily recommend it as a solution to encourage secondary school attendance among students. This recommendation extends further to students in other countries, including the United States. One limitation I would point out that the data we have only includes the program as conducted in Colombia relative to Colombia's private schools and its private school costs. Thus, the results of this experiment aren't necessarily generalizable to the rest of the world. Here are a few examples of characteristics of Colombia that could make it an outlier in comparison to the rest of the world: private secondary schooling in Colombia has an unusually poor reputation and isn't appealing to those who receive the treatment vouchers; Colombia's private secondary schooling may be so expensive that even a voucher that covers more than half of the costs of the tuition still doesn't make the schooling accessible, and so even if students attend the private schooling initially, it isn't sustainable in the long run; or the norm for students is to complete about 7 years of school (the average) and group out to support their family, and cheaper private secondary school tuition doesn't necessarily change that norm. This is a wide range of reasons as to why Colombia itself could be a unique situation in which the distribution of private schooling vouchers doesn't increase the average number of years in school completed. It could be beneficial to understand the trends of a variety of countries that have a variety of characteristics in order to better understand how the results of a school voucher program can be generalized to more countries.
+```
+
+### Question 3: Is an organized labor market beneficial for economic growth?
+```{r}
+library(reghelper)
+library(plm)
+library(ggplot2)
+
+growth = read.csv("/Users/kap237/Box/PERSONAL WORK/POLI 428/Final/growth.csv")
+
+#creating reverse variables
+growth$organ_rev = -growth$organ
+growth$leftpow_rev = -growth$leftpow
+
+#oildep variable is too small; I'm transforming it
+growth$oildep_p = 100*growth$oildep
+
+#This is panel data but also has time-level and 
+
+plm_growth = plm(gdp ~ organ*leftpow + oildep_p + demand, data = growth, index = c("year", "iso3c"), model = "pooling")
+summary(plm_growth)
+
+plm_growth_within = plm(gdp ~ organ*leftpow + oildep_p + demand, data = growth, index = c("year", "iso3c"), model = "within")
+summary(plm_growth_within)
+
+plm_growth_between = plm(gdp ~ organ*leftpow + oildep_p + demand, data = growth, index = c("year", "iso3c"), model = "between")
+summary(plm_growth_between)
+
+plm_growth_random = plm(gdp ~ organ*leftpow + oildep_p + demand, data = growth, index = c("iso3c", "year"), model = "random")
+summary(plm_growth_random)
+
+phtest(plm_growth, plm_growth_random)
+
+#Evidently, the best model to use here is the time- and country-level random effects, as this is, according to the ph test, significantly different from the pooled, within, and between effects. My only issue is that, no matter how hard I try, I cannot get lmer results to replicate this, and I obviously cannot predict uncertainty with plm. So bear with me as I used a model that I am recognizing is not the best model but it is the most significant model that I can get to work with lmer.
+
+why_wont_it_work = lmer(gdp ~ organ*leftpow + oildep_p + demand + (1 | year) + (1 | iso3c), data = growth)
+summary(why_wont_it_work)
+
+#Maybe that's the point of this question, that there's supposed to be this unsolvable element about the fact that lmer won't replicate the plm results and I'm supposed to find another solution or maybe there is a way to get lmer to replicate the plm random effects results that I did create above and I just can't figure it out, but either way, I figured I would give proof that I know what the model should look like in lmer and it won't work
+
+hate = lmer(gdp ~ organ*leftpow + oildep_p + demand + year + (1 | iso3c), data = growth)
+summary(hate)
+
+stan_growth = stan_glmer(gdp ~ organ*leftpow + oildep_p + demand + year + (1 | iso3c), data = growth, refresh = 0, cores = 12)
+print(stan_growth, digits = 3)
+
+#I need to be able to calculate the standard deviations for the variables in substantive effects:
+summary(growth$leftpow)
+2*sd(growth$leftpow)
+
+summary(growth$organ)
+2*sd(growth$organ)
+
+summary(growth$oildep_p)
+2*sd(growth$oildep_p)
+
+summary(growth$demand)
+2*sd(growth$demand)
+
+cases = data.frame(leftpow = c(0, 1.97, 0, 0, 0, 1.97),
+                    organ = c(0, 0, 2.07, 0, 0, 2.07),
+                    oildep_p = c(0, 0, 0, 5.43, 0, 0),
+                    demand = c(0, 0, 0, 0, 258.36, 0),
+                    iso3c = rep("USA", 6),
+                    year = rep(1978, 6))
+row.names(cases) = c("base", "leftpow", "organ", "oildep_p", "demand", "leftpow*organ")
+
+predict_growth = posterior_epred(stan_growth, newdata = cases)
+
+subeff_growth = data.frame(predict_growth)
+
+#Substantive effects
+mean(subeff_growth$base)
+quantile(subeff_growth$base, c(0.025, 0.975))
+
+mean(subeff_growth$leftpow - subeff_growth$base)
+quantile(subeff_growth$leftpow - subeff_growth$base, c(0.025, 0.975))
+
+mean(subeff_growth$organ - subeff_growth$base)
+quantile(subeff_growth$organ - subeff_growth$base, c(0.025, 0.975))
+
+mean(subeff_growth$oildep_p - subeff_growth$base)
+quantile(subeff_growth$oildep_p - subeff_growth$base, c(0.025, 0.975))
+
+mean(subeff_growth$demand - subeff_growth$base)
+quantile(subeff_growth$demand - subeff_growth$base, c(0.025, 0.975))
+
+mean(subeff_growth$leftpow.organ - subeff_growth$base)
+quantile(subeff_growth$leftpow.organ - subeff_growth$base, c(0.025, 0.975))
+
+#The relative effects are clear here, and they are the following:
+
+#Holding all other variables constant at 0 or a constant value, a 2 standard deviation increase in the   index of left-wing power in terms of legislative seats and cabinet portfolios has the relative effect of a 1.91 percent decrease in GDP
+
+#Holding all other variables constant at 0 or a constant value, a 2 standard deviation increase in the index of organization in the labor market in terms of increasing union density and major confederation share and decreasing public sector share and number of confederation-affiliated unions has the relative effect of a 1.66 percent decrease in GDP
+
+#Holding all other variables constant at 0 or a constant value, a 2 standard deviation increase in the price of oil in US dollars weighted by dependence on imported oil times 100 (so if it was a proportion before (the wording is unclear), now it's a percentage) has the relative effect of a 0.85 percent decrease in GDP
+
+#Holding all other variables constant at 0 or a constant value, a 2 standard deviation increase in the overall real GDP growth in the OECD as weighted by national exposure to trade has the relative effect of a 1.94 percent increase in GDP
+
+#Holding all other variables constant at 0 or a constant value, a 2 standard deviation increase in both the left-wing power index and labor market organization index has the relative effect of a 2.37 percent decrease in GDP
+
+#Here we can conclude that when the hypothesis is correct; a highly organized labor market is beneficial for economic growth when left-wing parties are powerful, whereas a less organized labor market is beneficial when right-wing parties are powerful.
+
+#Here's a caterpillar plot
+sims = as.matrix(stan_growth)
+mu_a_sims = as.matrix(sims[, 1])
+u_sims = sims[, 8:21]
+a_sims = as.numeric(mu_a_sims) + u_sims          
+
+a_mean = apply(a_sims, 2, mean)
+a_sd = apply(a_sims, 2, sd)
+a_quant = apply(a_sims, 2, quantile, 
+                 probs = c(0.025, 0.50, 0.975))
+a_quant = data.frame(t(a_quant))
+names(a_quant) = c("Q2.5", "Q50", "Q97.5")
+a_df = data.frame(a_mean, a_sd, a_quant)
+round(head(a_df), 2)
+
+a_df = a_df[order(a_df$a_mean), ]
+a_df$a_rank = c(1 : dim(a_df)[1])
+
+a_df$a_rank[a_df$a_rank == 1] = "NLD"
+a_df$a_rank[a_df$a_rank == 2] = "GBR"
+a_df$a_rank[a_df$a_rank == 3] = "BEL"
+a_df$a_rank[a_df$a_rank == 4] = "NOR"
+a_df$a_rank[a_df$a_rank == 5] = "SWE"
+a_df$a_rank[a_df$a_rank == 6] = "DNK"
+a_df$a_rank[a_df$a_rank == 7] = "FRA"
+a_df$a_rank[a_df$a_rank == 8] = "CAN"
+a_df$a_rank[a_df$a_rank == 9] = "AUT"
+a_df$a_rank[a_df$a_rank == 10] = "USA"
+a_df$a_rank[a_df$a_rank == 11] = "DEU"
+a_df$a_rank[a_df$a_rank == 12] = "ITA"
+a_df$a_rank[a_df$a_rank == 13] = "FIN"
+a_df$a_rank[a_df$a_rank == 14] = "JPN"
+
+#Caterpillar plot
+ggplot(data = a_df, 
+       aes(x = reorder(a_rank, a_mean), 
+           y = a_mean)) +
+  geom_pointrange(aes(ymin = Q2.5, 
+                      ymax = Q97.5)) + 
+  geom_hline(yintercept = mean(a_df$a_mean), 
+             size = 0.5, 
+             col = "red") + 
+  scale_x_discrete("Countries", 
+                     breaks = seq(from = 0, 
+                                  to = 85, 
+                                  by = 10)) + 
+  scale_y_continuous("Varying intercept") +
+  theme_bw()
+#These are the varying intercepts of the model as it holds with random effects. As we can see, there is not very great variation that comes from other countries; none of them are different than the average.
+ggplot(data = growth,
+       aes(x = organ*leftpow,
+           y = gdp)) +
+  geom_point() +
+  labs(x = "Labor Market Organization x Left-Wing Power Index",
+       y = "Percent Change in GDP")
+
+#Canada in 1982 had a bit of an outlying GDP percent change at -4.3%
+#Japan in 1968 and 1969 had an outlying GDP percent change as well, at 12.3% and 12.8%
+
+#Overall, there does appear to be a significant interaction between left-wing power and labor market organization influencing GDP
+```
+
+### Question 4: Does additional health care for new mothers increase the health of their children?
+```{r}
+library(rstanarm)
+
+health = read.csv("/Users/kap237/Box/PERSONAL WORK/POLI 428/Final/health.csv")
+
+fit_health = stan_glm(health ~ program, data = health, refresh = 0, cores = 12)
+print(fit_health, digits = 3)
+
+fit_health1 = stan_glm(health ~ program + income, data = health, refresh = 0, cores = 12)
+print(fit_health1, digits = 3)
+
+fit_health2 = stan_glm(health ~ program*income, data = health, refresh = 0, cores = 12)
+print(fit_health2, digits = 3)
+
+loo_health = loo(fit_health)
+loo_health1 = loo(fit_health1)
+loo_health2 = loo(fit_health2)
+loo_compare(loo_health, loo_health1, loo_health2)
+
+#I would probably prefer to use my interaction model here, given that it seems to be producing a more accurate number of estimates than the other models
+
+#It appears in these initial models that the maternity health care program does indeed affect children's health; comparing a child whose mother is enrolled and a child whose mother is not enrolled, the former has a greater health index score after two years. However, as I will soon discuss, misreported data might be skewing results here.
+
+par(mfrow = c(1,1))
+hist(health$income)
+
+#There's definitely strong evidence that women are misreporting their income, given that there is a relatively even spread of income from 0-19.7 in terms of thousands of dollars, but there's suddenly a huge increase in reported incomes at 19.8 in thousands of dollars, when $20,000 appears to be the cutoff point for participation in the program. There should be a right skew that gradually drops off, but as we see in the histogram, there's a huge spike just before 20,000$ in income. 
+
+#The result of misreporting incomes increases the regression coefficient for both program and income. Including a corrected income variable will likely decrease the regression coefficient for both program and income, although to what extent is yet to be known as of this point.
+
+w = rnorm(nrow(health), 5, 10)
+health$income_real = rep(NA, nrow(health))
+
+model_int1_p = rep(NA, 1000)
+model_int1_i = rep(NA, 1000)
+wrong_p = rep(NA, 1000)
+wrong_i = rep(NA, 1000)
+
+for(i in 1:1000){
+  health$income_real = health$income + rnorm(nrow(health), 5, 10) + rnorm(987, 0, 10)
+  model = lm(health ~ program + income_real, data = health)
+  model_int = lm(health ~ program*income_real, data = health)
+  model_int1_p[i] = coef(model_int)[2]
+  model_int1_i[i] = coef(model_int)[3]
+  wrong_model = lm(health ~ program*income, data = health)
+  wrong_p[i] = coef(wrong_model)[2]
+  wrong_i[i] = coef(wrong_model)[3]
+}
+
+mean(model_int1_p) - mean(wrong_p)
+#The program regression coefficient decreases quite significantly which suggests that the program has a positive and significant result on children's health to suggesting that the program has a negative effect on children's health.
+
+mean(model_int1_i) - mean(wrong_i)
+#The income regression coefficient decreases slightly which suggests that income has a positive and significant result on children's health to suggesting that income has a negative effect on children's health.
+
+#As we can tell from the above simulations, the correction of the misrepresented income data decreases the coefficients, as I predicted before I ran the simulations.
+
+health_final = stan_glm(health ~ program + income_real, data = health, refresh = 0, cores = 12)
+print(health_final, digits = 3)
+
+health_int_final = stan_glm(health ~ program*income_real, data = health, refresh = 0, cores = 12)
+print(health_int_final, digits = 3)
+
+#Instead, we see that, when two children who are both involved in the program, one whose mother has a higher income in comparison to one whose mother has a lower income has, on average, a reduction in health of about 0.062 for every increment in income. Holding income and all other covariates constant, the reception of the program leads to a health increase in children of about 0.655 points (?), but this is not a statistically significant transformation. Therefore, I would generally conclude that the program is not effective at promoting health in children, although it is difficult to perfectly estimate because mothers often under report their income in order to qualify for programs like this one.
+```

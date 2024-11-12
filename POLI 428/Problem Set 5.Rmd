@@ -1,0 +1,318 @@
+---
+title: "Problem Set 5"
+author: "Kendra Pinegar; Completion code: 6337"
+date: "2024-02-14"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 1
+```{r}
+
+library(MASS)
+load("C:/Users/kap237/Box/PERSONAL WORK/POLI 428/ROS-Examples-master/NES/data/nes.rda")
+
+nes = subset(nes, year == 2000)
+#partyid7 (factor)
+#ideo7 (continuous)
+#female
+#age_10 and age_sq_10 
+#black and white
+#educ1 (continuous)
+#income (continuous)
+
+
+fit = polr(factor(partyid7) ~ ideo7 + female + age_10 + age_sq_10 + black + white + educ1 + income, data = nes)
+summary(fit)
+
+cat("When comparing a voter who is one point more conservative and a voter who is one point less conservative, the latter is more likely to identify with the Republican party, given that the coefficient is positive. Since the coefficient is greater than the standard error x2, this is a significant coefficient.")
+
+cat("When comparing a male voter and a female voter, the latter is less likely to identify with the Republican party, given that the coefficient is negative. Since the coefficient. Since the coefficient is not greater than the standard error x2, though, this is not a significant coefficient.")
+
+cat("When comparing a voter who is younger and a voter who is older, the latter is less likely to identify with the Republican party until a certain point, and then the latter will start to identify more and more with the Republican party, given that the age squared coefficient is positive and the age coefficient is negative. The age squared coefficient is not greater than the standard error x2, so this is not a significant coefficient, but the age coefficient is greater than the standard error x2, this is a significant coefficient.")
+
+cat("When comparing a non-black voter and a black voter, the latter is less likely to identify with the Republican party, given that the coefficient is negative. Since the coefficient is greater than the standard error x2, this is a significant coefficient.")
+
+cat("When comparing a non-white voter and a white voter, the latter is more likely to identify with the Republican party, given that the coefficient is positive. Since the coefficient is not greater than the standard error x2, though, this is not a significant coefficient.")
+
+cat("When comparing a voter with one less unit of education and a voter with one more unit of education, the latter is more likely to identify with the Republican party, given that the coefficient is positive. Since the coefficient is greater than the standard error x2, this is a significant coefficient.")
+
+cat("When comparing a voter with less income and a voter with more income, the latter is more likely to identify with the Republican party, given that the coefficient is positive. Since the coefficient is greater than the standard error x2, this is a significant coefficient.")
+
+#15.4b
+
+nes$ideo7_m = nes$ideo7 - median(nes$ideo7, na.rm = TRUE)
+nes$age_10_m = nes$age_10 - median(nes$age_10, na.rm = TRUE)
+nes$age_sq_10_m = nes$age_sq_10 - median(nes$age_sq_10, na.rm = TRUE)
+nes$educ1_m = nes$educ1 - median(nes$educ1, na.rm = TRUE)
+nes$income_m = nes$income - median(nes$income, na.rm = TRUE)
+
+fit_1 = polr(factor(partyid7) ~ ideo7_m + female + age_10_m + age_sq_10_m + black + white + educ1_m + income_m, data = nes)
+summary(fit_1)
+
+cases = data.frame(ideo7_m = c(0, 3, 0, 0, 0, 0, 0, 0, 0),
+                   female = c(0, 0, 1, 0, 0, 0, 0, 0, 0),
+                   age_10_m = c(0, 0, 0, 3.6, 0, 0, 0, 0, 0),
+                   age_sq_10_m = c(0, 0, 0, 0, 46.08, 0, 0, 0, 0),
+                   black = c(0, 0, 0, 0, 0, 1, 0, 0, 0),
+                   white = c(0, 0, 0, 0, 0, 0, 1, 0, 0),
+                   educ1_m = c(0, 0, 0, 0, 0, 0, 0, 1, 0),
+                   income_m = c(0, 0, 0, 0, 0, 0, 0, 0, 2))
+row.names(cases) = c("base", "ideo", "female", "age", "age squared", "black", "white", "educ", "income")
+
+subst_eff_predict = predict(fit_1, newdata = cases)
+subst_eff_predict
+
+subst_eff_prob = predict(fit_1, type = "probs", cases)
+subst_eff_prob[,1]
+
+
+cat("The age variable is a good predictor how likely an individual is to be a strong democrat. The same goes for the black variable; voters who are black, compared to voters who are not black, are more likely to be strong democrats.")
+
+```
+
+### Question 2
+```{r}
+
+#2a
+library(foreign)
+library(nnet)
+library(stargazer)
+nes_92 = read.dta("/Users/kap237/Box/PERSONAL WORK/POLI 428/nes1992subset.dta")
+
+nes_92$vote = factor(nes_92$vote, labels = c("Bush", "Clinton", "Perot"))
+nes_92$vote = relevel(nes_92$vote, ref = "Bush")
+
+fit_2 = multinom(vote ~ conservative + economyworse + education + union + income + black, data = nes_92)
+summary(fit_2)
+
+stargazer(fit_2, type = "html", out = "fit_2.htm", star.cutoffs = 0.05)
+
+#2b
+cat("When comparing a voter who is one point less conservative and a voter who is one point more conservative, the latter is less likely to vote for Clinton relative to Bush, given that the coefficient is negative. Since the coefficient is greater than the standard error x2, this is a significant coefficient.")
+
+cat("When comparing a voter who is one point less conservative and a voter who is one point more conservative, the latter is less likely to vote for Perot relative to Bush, given that the coefficient is negative. Since the coefficient is greater than the standard error x2, this is a signficant coefficient.")
+
+cat("When comparing a voter who thinks the economy has gotten worse by one less point and a voter who thinks the economy has gotten worse by one more point, the latter is more likely to vote for Clinton relative to Bush, given that the coefficient is positive. Since the coefficient is greater than the standard error x2, this is a significant coefficient.")
+
+cat("When comparing a voter who thinks the economy has gotten worse by one less point and a voter who thinks the economy has gotten worse by one more point, the latter is more likely to vote for Perot relative to Bush, given that the coefficient is positive. Since the coefficient is greater than the standard error x2, this is a significant coefficient.")
+
+cat("When comparing a voter with one less unit of education and a voter with one more unit of education, the latter is less likely to vote for Clinton relative to Bush, given that the coefficient is negative. Since the coefficient is greater than the standard error x2, this is a significant coefficient.")
+
+cat("When comparing a voter with one less unit of education and a voter with one more unit of education, the latter is less likely to vote for Perot relative to Bush, given that the coefficient is negative. Since the coefficient is not greater than the standard error x2, this is not a significant coefficient.")
+
+cat("When comparing a voter who is not a part of a union and a voter who is a part of a union, the latter is more likely to vote for Clinton relative to Bush, given that the coefficient is positive. Since the coefficient is not greater than the standard error x2, this is not a significant coefficient.")
+
+cat("When comparing a voter who is not a part of a union and a voter who is a part of a union, the latter is more likely to vote for Perot relative to Bush, given that the coefficient is positive. Since the coefficient is not greater than the standard error x2, this is not a significant coefficient.")
+
+cat("When comparing a voter who has less income and a voter who has more income, the latter is more likely to vote for Clinton relative to Bush, given that the coefficient is positive. Since the coefficient is not greater than the standard error x2, though, this is not a signficant coefficient.")
+
+cat("When comparing a voter who has less income and a voter who has more income, the latter is more likely to vote for Perot relative to Bush, given that the coefficient is positive. Since the coefficient is not greater than the standard error x2, though, this is not a signficant coefficient.")
+
+cat("When comparing a non-black voter and a black voter, the latter is more likely to vote for Clinton relative to Bush, given that the coefficient is positive. Since the coefficient is greater than the standard error x2, this is a significant coefficient.")
+
+cat("When comparing a non-black voter and a black voter, the latter is less likely to vote for Perot relative to Bush, given that the coefficient is negative Since the coefficient is not greater than the standard error x2, though, this is not a significant coefficient.")
+
+cat("The intercept coefficient indicates that when all continuous variables (income, education, whether the economy is worse or not, conservative) are held constant at 0 and when a voter is not black, male, and not in a union, the voter is more likely to vote for Clinton relative to Bush, given that the coefficient is positive. Since the coefficient is greater than the standard error x2, this is a significant coefficient.")
+
+cat("The intercept coefficient indicates that when all continuous variables (income, education, whether the economy is worse or not, conservative) are held constant at 0 and when a voter is not black, male, and not in a union, the voter is more likely to vote for Perot relative to Bush, given that the coefficient is positive. Since the coefficient is not greater than the standard error x2, though, this is not a significant coefficient.")
+
+#2c
+nes_92$vote = relevel(nes_92$vote, ref = "Perot")
+
+fit_3 = glm(vote ~ conservative + economyworse + education + union + income + black, data = nes_92, subset = (nes_92$vote != "Bush"), family = binomial(link = "logit"))
+
+stargazer(fit_3, type = "html", out = "fit_3.html", star.cutoffs = 0.05)
+
+cat("When comparing a voter who is one point less conservative and a voter who is one point more conservative, the latter is less likely to vote for Clinton relative to Perot, given that the coefficient is negative. Since the coefficient is greater than the standard error x2, this is a significant coefficient.")
+
+cat("When comparing a voter who thinks the economy has gotten worse by one less point and a voter who thinks the economy has gotten worse by one more point, the latter is more likely to vote for Clinton relative to Perot, given that the coefficient is positive. Since the coefficient is greater than the standard error x2, this is a significant coefficient.")
+
+cat("When comparing a voter with one less unit of education and a voter with one more unit of education, the latter is less likely to vote for Clinton relative to Perot, given that the coefficient is negative. Since the coefficient is not greater than the standard error x2, though, this is not a significant coefficient.")
+
+cat("When comparing a voter who is not a part of a union and a voter who is a part of a union, the latter is more likely to vote for Clinton relative to Perot, given that the coefficient is positive. Since the coefficient is not greater than the standard error x2, though, this is not a significant coefficient.")
+
+cat("When comparing a voter who has less income and a voter who has more income, the latter is more likely to vote for Clinton relative to Perot, given that the coefficient is positive. Since the coefficient is not greater than the standard error x2, though, this is not a signficant coefficient.")
+
+cat("When comparing a non-black voter and a black voter, the latter is more likely to vote for Clinton relative to Perot, given that the coefficient is positive. Since the coefficient is greater than the standard error x2, this is a significant coefficient.")
+
+cat("The intercept coefficient indicates that when all continuous variables (income, education, whether the economy is worse or not, conservative) are held constant at 0 and when a voter is not black, male, and not in a union, the voter is more likely to vote for Clinton relative to Perot, given that the coefficient is positive. Since the coefficient is not greater than the standard error x2, though, this is not a significant coefficient.")
+
+#2d
+nes_92$vote = relevel(nes_92$vote, ref = "Bush")
+
+fit_4 = glm(vote ~ conservative + economyworse + education + union + income + black, data = nes_92, subset = (nes_92$vote != "Perot"), family = binomial(link = "logit"))
+
+stargazer(fit_4, type = "html", out = "fit_4.html", star.cutoffs = 0.05)
+
+cat("The direction and significance of the coefficients are the same as the results from part a of this problem; however, the coefficients do differ in magnitude. This occurs because the model is different; with the logit model, I'm calculating a bernoulli model where there are only two values. However, with an unordered multinomial logistic model with different cutoff points and different parameters. The logit model removes Perot, so Perot's votes cannot affect the probability of choosing Bush or Clinton, so the coefficients are going to be different.")
+
+#2e
+nes_92$conservative_m = nes_92$conservative - median(nes_92$conservative, na.rm = TRUE)
+nes_92$economyworse_m = nes_92$economyworse - median(nes_92$economyworse, na.rm = TRUE)
+nes_92$education_m = nes_92$education - median(nes_92$education, na.rm = TRUE)
+nes_92$income_m = nes_92$income - median(nes_92$income, na.rm = TRUE)
+
+fit_5 = multinom(vote ~ conservative_m + economyworse_m + education_m + union + income_m + black, data = nes_92)
+
+new = data.frame(conservative_m = c(-4, -3, -2, -1, 0, 1, 2),
+                 economyworse_m = c(0, 0, 0, 0, 0, 0, 0),
+                 education_m = c(0, 0, 0, 0, 0, 0, 0),
+                 union = c(0, 0, 0, 0, 0, 0, 0),
+                 income_m = c(0, 0, 0, 0, 0, 0, 0),
+                 black = c(0, 0, 0, 0, 0, 0, 0))
+
+predict = predict(fit_5, newdata = new, type = "probs")
+predict = as.data.frame(predict)
+
+predict$conservative = c(1, 2, 3, 4, 5, 6, 7)
+
+library(ggplot2)
+
+ggplot(data = predict) +
+  geom_line(aes(x = conservative,
+                y = Bush,
+                color = "Bush")) +
+  geom_line(aes(x = conservative,
+                y = Clinton,
+                color = "Clinton")) +
+  geom_line(aes(x = conservative,
+                y = Perot,
+                color = "Perot")) +
+  scale_color_manual(values = c("magenta", "orange", "darkblue")) +
+  labs(x = "Conservative Ideology",
+       y = "Probability of Voting",
+       title = "Probabilities of Voting for Bush, Clinton, and Perot",
+       colour = "Presidents")
+
+cat("The graph shows that as a voter has a more conservative ideology, he is less likely to vote for Clinton. Additionally, the graph shows that as a voter has a more conservative ideology, he is more likely to vote for Bush. For Perot, as a voter has a more conservative ideology, he is more likely to vote for Perot, more so than Bush, up until a conservative score of approximately 3.3. At about a conservative score of approximately 5, as a voter has a more conservative ideology, he is less likely to vote for Perot.")
+
+#2f
+nes_factors = c("conservative", "economyworse", "education", "union", "income", "black", "vote")
+nes_cleaned = nes_92[complete.cases(nes_92[nes_factors]),]
+
+table(nes_cleaned$vote)
+sum(table(nes_cleaned$vote))
+1-(205/479)
+error_null = 1 - (max(tabulate(nes_cleaned$vote))/length(nes_cleaned$vote))
+error_null
+
+fit_2 = multinom(vote ~ conservative + economyworse + education + union + income + black, data = nes_92)
+
+nes_cleaned$prediction = predict(fit_2, newdata = nes_cleaned, type = "class")
+table(nes_cleaned$prediction, nes_cleaned$vote)
+1-((150 + 166 + 0)/479)
+error_model = mean(nes_cleaned$vote != nes_cleaned$prediction)
+error_model
+
+cat("The model has rather good fit, considering that the error rate of the model is", mean(nes_cleaned$vote != nes_cleaned$prediction), "whereas the error rate of the null model is", error_null)
+
+```
+
+### Question 3
+```{r}
+
+library(rstanarm)
+
+risky = read.csv("/Users/kap237/Box/PERSONAL WORK/POLI 428/ROS-Examples-master/RiskyBehavior/data/risky.csv")
+
+#15.1a
+
+risky$fupacts = as.integer(risky$fupacts)
+
+fit_6 = stan_glm(fupacts ~ women_alone + couples, family = poisson(link = "log"), data = risky, refresh = 0)
+print(fit_6, digits = 3)
+
+sqrt(mean(risky$fupacts))
+sd(risky$fupacts)
+cat("Since the standard deviation is much larger than the square root of the mean, this means that there is overdispersion, and overdispersion means that the model does not fit well.")
+
+risky$predict_dp_6 = predict(fit_6)
+
+par(mfrow = c(1,2))
+hist(risky$fupacts, freq = FALSE)
+hist(risky$predict_dp_6, freq = FALSE)
+cat("Considering that the predicted values do not seem to be very representative of the actual give values, it appears that this model does not fit well.")
+
+fit_6_loo = loo(fit_6, k_threshold = 0.7) #I include the "k_threshold = 0.7" because an error code told me I should
+print(fit_6_loo)
+cat("The estimated effect number of parameters is about 128, which, in comparison to the total number of parameters being 2, is not close at all. This model does not fit well.")
+
+#15.1b
+
+fit_7 = stan_glm(fupacts ~ women_alone + couples + bupacts + bs_hiv + sex, family = poisson(link = "log"), data = risky, refresh = 0)
+print(fit_7, digits = 3)
+
+
+risky$predict_dp_7 = predict(fit_7)
+
+hist(risky$fupacts, freq = FALSE)
+hist(risky$predict_dp_7, freq = FALSE)
+cat("This histogram looks a little better than the first one, but it still doesn't seem to be an exact match. This may indicate that this model is not a good fit.")
+
+par(mfrow = c(1,1))
+predicted_data_7 = posterior_predict(fit_7)
+hist(predicted_data_7, freq = FALSE)
+cat("This model predicts a rather large range of numbers, spanning all the way up to almost 300.")
+
+predicted_7 = as.data.frame(predicted_data_7)
+predicted_proportions_7 = rowMeans(predicted_7 == 0)
+proportions = sum(risky$fupacts == 0)/length(risky$fupacts)
+
+hist(predicted_proportions_7, freq = FALSE)
+proportions
+cat("Where the predicted proportions tend to predict 0 hardly ever occurring in the dataset, the actual proportion of observations that are equal to 0 is", proportions, ", so this likely indicates that the model doesn't fit super well.")
+
+fit_7_loo = loo(fit_7, k_threshold = 0.7) #I include the "k_threshold = 0.7" because an error code told me I should
+print(fit_7_loo)
+cat("The estimated effect number of parameters is about 258, which, in comparison to the total number of parameters being 5, is not close at all. This model does not fit well. While comparatively this number is only about 51 times greater, whereas the old model was 64 times greater, this model is still not a good fit, and there's still evidence of overdispersion.")
+
+#15.1c
+fit_8 = stan_glm(fupacts ~ women_alone + couples + bupacts + bs_hiv + sex, family = neg_binomial_2, data = risky, refresh = 0)
+print(fit_8, digits = 3)
+
+1/0.4117
+cat("The reciprocal_dispersion estimate", 1/0.4117, "is greater than 1, which means that the model is overdispersed.")
+
+risky$predict_dp_8 = predict(fit_8)
+
+par(mfrow = c(1,2))
+hist(risky$fupacts, freq = FALSE)
+hist(risky$predict_dp_8, freq = FALSE)
+cat("This histogram looks a little better than the one from part b one, but it still doesn't seem to be an exact match. It doesn't decrease perfectly like the actual model, but it does decrease in predictions, which may indicate that it is a better fit for the model than the model from part b.")
+
+par(mfrow = c(1,1))
+predicted_data_8 = posterior_predict(fit_8)
+hist(predicted_data_8, freq = FALSE)
+cat("This model is kind of hard to interpret, considering all the values below 50,000 are lumped into one, but it seems to have a very large spread, perhaps more than the model actually calls for.")
+
+predicted_8 = as.data.frame(predicted_data_8)
+predicted_proportions_8 = rowMeans(predicted_8 == 0)
+proportions = sum(risky$fupacts == 0)/length(risky$fupacts)
+
+hist(predicted_proportions_8, freq = FALSE)
+proportions
+cat("This model, fitted using the negative binomial regression, is actually demonstrating a similar proportion (or at least a normal distribution surrounding the estimated values of actual observed 0s), which indicates that this model actually has better fit than the poisson model from part b of this question.")
+
+fit_8_loo = loo(fit_8)
+print(fit_8_loo)
+cat("The estimated effect number of parameters is about 7, which is much closer to the actual number of parameters 5 than the previous model, which estimated 258 parameters compared to the actual number of parameters 5. This means that this negative binomial regression is a much better fit for the model than the poisson model.")
+
+loo_compare(fit_6_loo, fit_7_loo, fit_8_loo)
+cat("According to this loo comparison, it appears that fit_8 produces my best model (as I had kind of already predicted above), because the elpd_diff calculated for fit_7 and fit_8, respectively, is -4438 and -5708, and these elpd_diffs are more than 2 standard errors away from 0 (the standard errors are 494 and 622, respectively). Therefore, model fit_8 is the best fitting model for this dataset.")
+
+print(fit_8, digits = 3)
+
+cat("According to this model, when women took the intervention alone, as compared to taking the intervention as a couple, the instances of unprotected sex were more likely to decrease. While I only have the logged odds reported in the coefficients, we can still that this is the case because the coefficient is", coef(fit_8)[2], "and the standard error is", se(fit_8)[2], "and the given coefficient is more than 2 times the standard error away from 0; therefore, the coefficient is significant. While the coefficient for the couples treatment is negative as well,", coef(fit_8)[3], "the given coefficient is not more than 2 times the standard error away from 0,", se(fit_8)[3]*2, "; therefore, the coefficient is not significant. So the women only treatment is a significant treatment, but the couples treatment is not.")
+
+cat("Yes, that is problematic. One of the assumptions of regressions is that observations are independently observed, but seeing as couples are most likely going to have the same number of unprotected acts, this means that these observations are not independently observed and are technically dependent on each other. We should probably only be recording the data from one person in the couple, like perhaps the woman to keep it consistent with the fact that we are observing a women only treatment group.")
+
+#I used this website to understand loo a little bit better: https://mc-stan.org/loo/articles/loo2-example.html
+```
+
+##### I compared my work with Vanessa but did not make any changes based on her answers.

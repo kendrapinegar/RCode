@@ -1,0 +1,415 @@
+---
+title: "Problem Set 9"
+author: "Kendra Pinegar, Completion code: 4687"
+date: "2024-03-20"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 1: How do student-level factors and school-level factors affect achievement?
+
+(a)
+```{r}
+library(haven)
+library(ggplot2)
+library(plm)
+
+hsb = read_dta("/Users/kap237/Box/PERSONAL WORK/POLI 428/hsb_a9.dta")
+
+head(hsb)
+sum(table(hsb$female))
+cat("There are 7,185 students in this dataset")
+
+sum(table(unique(hsb$schoolid)))
+cat("there are 160 different schools")
+
+cat("The variables minority, female, ses, and mathach are at the student level.
+The variables sector, pracad, disclim, and schoolid are at the school level.")
+
+fit = plm(mathach ~ ses, data = hsb, index = "schoolid", model = "pooling")
+b_hat = coef(fit)[2]
+a_hat = coef(fit)[1]
+
+ggplot(data = hsb,
+       aes(x = ses,
+           y = mathach)) +
+  geom_point() +
+  geom_abline(aes(intercept = a_hat,
+                  slope = b_hat),
+              color = "magenta")
+
+fit_1 = plm(mathach ~ ses, data = hsb, index = "schoolid", model = "within")
+summary(fit_1)
+a_hat1 = fixef(fit_1)
+b_hat1 = coef(fit_1)[1]
+
+ggplot(data = hsb,
+       aes(x = ses,
+           y = mathach)) +
+  geom_point() +
+  geom_smooth(aes(group= schoolid),
+              method = "lm",
+              se = FALSE,
+              linewidth = 0.15,
+              color = "magenta")
+
+cat("This shows that generally, the relationship between mathach and ses is positive; the greater that ses is, the greater mathach is. There definitely is some variation, like when they're related negatively, but the initial plot showed a pretty positive correlation.")
+```
+
+(b)
+```{r}
+
+fit = plm(mathach ~ ses + minority + female + sector + pracad + disclim, data = hsb, index = "schoolid", model = "pooling")
+summary(fit)
+
+cat("When comparing a student with a socioeconomic status score one point higher and a student with a socioeconomic status one point lower, the former has, on average, 2.09276 higher of a mathematics achievement score. This coefficient is statistically significant, given that it's greater than two times its standard error,", 2*0.10239)
+
+cat("When comparing a student who is not white and a student who is white, the former has, on average, 3.01106 lower of a mathematics achievement score. This coefficient is statistically significant, given that it's greater than two times its standard error,", 2*0.16942)
+
+cat("When comparing a female student and a male student, the former has, on average, 1.40999 lower of a mathematics achievement score. This coefficient is statistically significant, given that it's greater than two times its standard error,", 2*0.14685)
+
+cat("When comparing a student at a catholic school and a student not at a catholic school, the former has, on average, 0.53867 higher of a mathematics achievement score. This coefficient is statistically significant, given that it's greater than two times its standard error,", 2*0.23221)
+
+cat("When comparing a student at a school where all students are on the academic track and a student at a school where no students are on the academic track, the former has, on average, 3.77608 higher of a mathematics achievement score. This coefficient is statistically significant, given that it's greater than two times its standard error,", 2*0.42635)
+
+cat("When comparing a student at a school with a higher disciplinary climate and a student at a school with a lower disciplinary climate, the former has, on average, 0.36734 lower of a mathematics achievement score. This coefficient is statistically significant, given that it's greater than two times its standard error,", 2*0.11589)
+```
+
+(c)
+```{r}
+
+fit_within = plm(mathach ~ ses + minority + female + sector + pracad + disclim, data = hsb, index = "schoolid", model = "within")
+summary(fit_within)
+
+cat("The coefficient for the ses variable in the fixed-effect regression is 1.91216, whereas the coefficient for the ses variable in the previous model with no fixed effects is 2.09276, meaning they differ by about 0.2. They differ because some of the changes in the socioeconomic status of students might vary by school (meaning that schools had a greater variety in socioeconomic status than just between schools that accounts for mathematical achievements.")
+
+cat("The sector variable goes away because it's not an individual-level variable.")
+
+pFtest(fit_within, fit)
+cat("The fixed effects results are significant.")
+
+fixef(fit_within)
+cat("The predicted intercept of a white male with ses = 0 in school 1288 is 14.1409.")
+```
+
+(d)
+```{r}
+fit_between = plm(mathach ~ ses + minority + female + sector + pracad + disclim, data = hsb, index = "schoolid", model = "between")
+summary(fit_between)
+
+cat("The coefficient for the ses variable in the between-effect regression is 3.16720, in comparison to the within-effect coefficient of 1.91216 and the regular coefficient of 2.09276. This results differ because there is greater variety in socioeconomic status between schools than within that accounts for mathematical achievements.")
+
+cat("The coefficient for the sector variable in the between-effect regression is 0.3033, in comparison to the completely-pooled regression coefficient of 0.53867, but the within-effect coefficient is dropped because it's a school-level variable. The resUlts differ because there is greater variety in catholicism between schools than just comparing the completely-pooled model.")
+
+```
+
+(e)
+```{r}
+fit_random = plm(mathach ~ ses + minority + female + sector + pracad + disclim, data = hsb, index = "schoolid", model = "random")
+summary(fit_random)
+
+library(lme4)
+lmer_random = lmer(mathach ~ ses + minority + female + sector + pracad + disclim + (1 | schoolid), data = hsb)
+summary(lmer_random)
+
+cat("The lmer and plm regression coefficients for ses and sector are relatively the same.")
+
+cat("The coefficient for the ses variable in the random-effect regression is 1.98269, where the within-effect regression coefficient was 1.91216 and the between-effect regression coefficient was 3.16720. These results differ because they are measuring different things; within-effect measures the effects of socioeconomic status within schools, between-effect measures the effects of socioeconomic status between schools, and random-effect combines within-effect and between-effect")
+
+cat("The coefficient for the sector variable in the random-effect regression is 0.40143, where the between-effect regression coefficient was 0.30333 (and I'm assuming that the within-effect regression coefficnet was greater than 0.40143 to create the pull). This results differ because they are measuring different things; the between-effect measures the effects of ")
+
+cat("This is what the random-effect regression or partial pooling regression does for all of the coefficients; it essentially takes a weighted average of the within-effect and between-effect regressions.")
+```
+
+(f)
+```{r}
+
+pFtest(fit_within, fit_random)
+
+cat("This test determines if the fixed effects coefficients are different than the random effects coefficients. According to test, no, the  fixed effects coefficients are not different than the random effects coefficients.")
+```
+
+(g)
+```{r}
+library(datawizard)
+
+hsb = cbind(hsb, demean(hsb, select = "ses", group = "schoolid"))
+
+cat("The ses_within variable is at the student level. The ses_between variable is at the school level.")
+
+fit_2 = lmer(mathach ~ ses_within + ses_between + minority + female + sector + pracad + disclim + (1 | schoolid), data = hsb)
+summary(fit_2)
+
+cat("The ses coefficient in the within-effect regression using lmer is 1.9136, whereas the coefficient for the regression using plm is 1.91212; the results really don't differ that much, and any differences are most likely a result of differences in how the models are estimated across methods
+The coefficient for the ses coefficient in the between-effect regression using lmer is 3.0771, whereas the coefficient for the regression using plm is 3.1672, which is definitely a bit bigger of a difference but is still most likely a result of differences in how the models are estimated across methods.
+Of course none of these coefficients are similar to the ses coefficient in the reandom-effect regression, since I haven't calculated a random-effect regression here.
+The ses coefficient in the within-effect regression is 1.9136, meaning that mathematical achievement increases with increases in socioeconomic status, even while controlling for differences within schools. This coefficient is statistically significant, given that the coefficient is greater than two times its standard error.
+The ses coefficient in the between-effect regression is 3.0771, meaning that mathematical achievement increases with increases in socioeconomic status, even while controlling for differences between schools (more so than when controlling for differences within schools). This coefficient is statistically significant, given that the coefficient is greater than two times its standard error.
+The sector coefficient in this new model is 0.5082, compared to 0.40143 in the random-effects regression model, 0.30333 in the between-effects regression model, and 0.53867 in the completely-pooled model. These differ because the new ses variables that account for both within- and between-school variability explain some of the varriance in school-level effects.")
+
+summary(lmer(mathach ~ ses + ses_between + minority + female + sector + pracad + disclim + (1 | schoolid), data = hsb))
+cat("The above regression gives the ses_between regression coefficient as the difference between the within-effect and between-effect regression coefficients, and given that the above regression produces a difference of 1.1635 with a standard error of 0.4139, the within- and between-effect coefficients are statistically different from each other. This means that the effect of socioeconomic status on mathematical achievement within schools is different from the effect of socioeconomic status on mathematical achievement between school.
+This is related to the Hausman test because that test calculates whether the coefficients from the fixed effects coefficients are different than the random effects coefficients, and while this differs in comparing fixed effects to between effects, it's the same idea of determining whether models give statistically different results.")
+```
+
+(h)
+```{r}
+library(reghelper)
+
+fit_null = lmer(mathach ~ 1 + (1 | schoolid), data = hsb)
+summary(fit_null)
+
+cat("The fixed effect means that the average school mathematical achievement is 12.637. The random effect for schoolid means that students vary in mathematical achievement, on average, by 2.935 points within schools. The random effect for Residual means that students vary in mathematical achievement, on average, by 6.257 points between schools.")
+
+ICC(fit_null)
+cat("The ICC value of 0.18 indicates that the degree of similarity among observations within the same group is relatively weak.")
+```
+
+(i)
+```{r}
+fit_student = lmer(mathach ~ ses + minority + female + (1 | schoolid), data = hsb)
+summary(fit_student)
+
+cat("The random effect change from the original value of 2.935 points of variation within schools to 1.917 points of variation among students within schools and 6.257 points of variation between schools to 5.992 points of variation between schools. These change because we account for more student-level variables (minority and female specifically) in the equation that account for change in points of mathematical achievements. ")
+
+ICC(fit_student)
+cat("The ICC value of 0.09 indicates that the degree of similarity among observations within the same group is even weaker than the initial ICC of 0.18. The ICC changes because variance among students within the same school decreased at a greater rate than variance among students between schools. ")
+```
+
+(j)
+```{r}
+fit_student_2 = lmer(mathach ~ ses_within + ses_between + minority + female + (1 | schoolid), data = hsb)
+summary(fit_student_2)
+
+cat("The ses coefficient in this model is 2.0894, whereas the ses_within coefficient in the previous model is 1.9263 and the ses_between coefficient in the previous model is 4.8082. The relationship between the former coefficient and the latter coefficients is that the former is the random-effects coefficient, which takes the weighted average of the within effects and between effects, so the former coefficient is an average between the two.")
+```
+
+(k)
+```{r}
+
+fit_full = lmer(mathach ~ ses_within + ses_between + minority + female + sector + pracad + disclim + (1 | schoolid), data = hsb)
+summary(fit_full)
+
+cat("The random effects change from 2.0894 to 1.9263 to 1.241 and 6.257 to 5.992 to 5.992, a change that is a result of the fact that the school-level variables are now accounted for in the between-effects model")
+
+ICC(fit_full)
+cat("The ICC value of 0.04 indicates that the degree of similarity among observations within the same group is even weaker than the previous ICC of 0.09. The ICC decreases even more because the variance among students within the same school decreased while the variance among students between schools didn't change.")
+
+cat("The predicted intercept for school 1288 is 12.84037. This is different from the fixed effect intercept because it reflects both the overall intercept and the school-specific variation in comparison to the fixed effect intercept which just captures the effect that is specific to each school with considering the variability between schools.")
+
+cat("The random effect for school 1288 indicates that school 1288 varies from the overall intercept by 0.4967 mathematical achievement points.")
+```
+
+(l)
+```{r}
+
+library(rstanarm)
+
+fit_stan = stan_lmer(mathach ~ ses_within + ses_between + minority + female + sector + pracad + disclim + (1 | schoolid), data = hsb, refresh = 0)
+print(fit_stan, digits = 3)
+
+cat("The results are relatively the same to about the first or second decimal place.")
+
+2*sd(hsb$ses_within)
+sd(unique(hsb$ses_between))
+
+
+cases = data.frame(ses_within = c(0, 1.32, 0),
+                  ses_between = c(-0.41, -0.41, 0.41),
+                  minority = c(0, 0, 0),
+                  female = c(0, 0, 0),
+                  sector = c(0, 0, 0),
+                  pracad = c(0, 0, 0),
+                  disclim = c(0, 0, 0),
+                  schoolid = c(1288, 1288, 1288))
+row.names(cases) = c("base", "ses_within", "ses_between")
+
+predict = posterior_epred(fit_stan, newdata = cases)
+
+subeff = data.frame(predict)
+
+#substantive effect of 2sd increase in de-meaned ses and 95% interval
+mean(subeff$ses_within - subeff$base)
+quantile(subeff$ses_within - subeff$base, c(0.025, 0.975))
+#substantive effect of 2sd increase in school-level ses and 95% interval
+mean(subeff$ses_between - subeff$base)
+quantile(subeff$ses_between - subeff$base, c(0.025, 0.975))
+```
+
+(m)
+```{r}
+
+sims = as.matrix(fit_stan)
+mu_a_sims = as.matrix(sims[, 1])
+u_sims = sims[, 9:168]
+a_sims = as.numeric(mu_a_sims) + u_sims          
+
+a_mean = apply(a_sims, 2, mean)
+a_sd = apply(a_sims, 2, sd)
+a_quant = apply(a_sims, 2, quantile,
+                 probs = c(0.025, 0.50, 0.975))
+a_quant = data.frame(t(a_quant))
+names(a_quant) = c("Q2.5", "Q50", "Q97.5")
+a_df = data.frame(a_mean, a_sd, a_quant)
+round(head(a_df), 2)
+a_df = a_df[order(a_df$a_mean), ]
+a_df$a_rank = c(1 : dim(a_df)[1])
+
+ggplot(data = a_df, 
+       aes(x = a_rank, 
+           y = a_mean)) +
+  geom_pointrange(aes(ymin = Q2.5, 
+                      ymax = Q97.5)) + 
+  geom_hline(yintercept = mean(a_df$a_mean), 
+             size = 0.5, 
+             col = "red") + 
+  scale_x_continuous("Rank", 
+                     breaks = seq(from = 0, 
+                                  to = 160, 
+                                  by = 10)) + 
+  scale_y_continuous("varying intercept") +
+  theme_bw()
+
+cat("About 11 schools are different than the average.")
+```
+
+### Question 2: How and why do wages change over time?
+
+(a)
+```{r}
+
+wage = read_dta("/Users/BYU Rental/Box/PERSONAL WORK/POLI 428/wage_nlsy.dta")
+
+cat("This is panel data, since it measures individual entities over a period of time.")
+
+sum(table(unique(wage$nr)))
+cat("There are 545 individuals in the data. Nr, black, hisp, and educ are individual-level variables. Lwage, union, married, exper, and year and year-level variables.")
+
+#ok this plot isn't as ugly as Goodliffe's so I'm plotting it like that please give me full points because the other one won't work while overlaying a line to the whole data set
+ggplot(data = subset(wage, nr < 200),
+       aes(x = year,
+           y = lwage)) +
+  geom_line(aes(group = nr)) +
+  geom_smooth(method = "lm",
+              color = "magenta")
+
+cat("This graph shows that the general relationship between lwage and year is positive; as time goes on, lwage increases.")
+```
+
+(b)
+```{r}
+
+fit_null = lmer(lwage ~ (1 | nr), data = wage)
+summary(fit_null)
+
+cat("The fixed effect means that the average individual logged wage is 1.64915. The random effects for nr means that logged wage, on average, varies by 0.366 between individuals. The random effects under Residual means that logged wage varies by 0.3872 within individuals over time.")
+
+ICC(fit_null)
+cat("The ICC value of 0.472 indicates that the degree of similarity among observations within individuals and their individual-level characteristics is somewhat strong.")
+
+
+```
+
+(c)
+```{r}
+
+wage$educ_c = wage$educ - 12
+wage$year_c = wage$year - 1980
+
+fit_full = lmer(lwage ~ black + hisp + union + married + exper + educ_c + year_c + (1 | nr), data = wage)
+summary(fit_full)
+
+cat("Centering the variables makes the reference point for education having graduated from high school and the reference point for time the first year data was collected instead of some arbitrary year 0.")
+
+cat("The black regression coefficient indicates that an individual who is black has, on average, a decrease in logged wage of 0.13384, and the coefficient is statistically significant, given that it's two times the size of its standard error.
+The hisp regression coefficient indicates that an individual who is hispanic has, on average, an increase in logged wage of 0.01743, but the coefficient isn't statistically significant, given that it isn't two times the size of its standard error.
+The union regression coefficient indicates that an individual who is part of a union has, on average, an increase in logged wage of 0.11038, and the coefficient is statistically significant, given that it's two times the size of its standard error.
+The married regression coefficient indicates that an individual who is married has, on average, an increase in logged wage of 0.07526, and the coefficient is statistically significant, given that it's two times the size of its standard error.
+The educ_c regression coefficient indicates that an individual with one additional year of school past high school has, on average, an increase in logged wage of 0.09469, and the coefficient is statistically significant, given that it's two times the size of its standard error.
+The year_c regression coefficient indicates that an individual one year after 1980 has, on average, an increase in logged wage of 0.02591, and the coefficient is statistically significant, given that it's two times the size of its standard error.")
+
+cat("The random effects changes from 0.366 to 0.3290 and from 0.3872 to 0.3536, and it changes because the new model accounts for new individual-level and time-varying variables, so the random effects coefficients are smaller.")
+
+ICC(fit_full)
+cat("The ICC value of 0.464 indicates that the degree of similarity among observations within individuals and their individual-level characteristics is somewhat strong still but slightly less similar than the previous model.")
+```
+
+(d)
+```{r}
+
+cat("The variable union might have an endogeneity problem because there are certainly underlying characteristics about an individual that would motivate joining a union.")
+
+wage = cbind(wage, demean(wage, select = "union", group = "nr"))
+
+fit_3 = lmer(lwage ~ black + hisp + union_within + union_between + married + exper + educ_c + year_c + (1 | nr), data = wage)
+summary(fit_3)
+
+cat("The union_within regression coefficient indicates that being a part of a union has, on average, an increase of logged wage of 0.083401, even when controlling for changes within individuals over time. The coefficient is statistically significant, given that it's two times the size of its standard error.
+The union_between regression coefficient indicates that being a part of a union has, on average, an increase of logged wage of 0.264752, even when controlling for changes between individuals. The coefficient is statistically significant, given that it's two times the size of its standard error.")
+
+summary(lmer(lwage ~ black + hisp + union + union_between + married + exper + educ_c + year_c + (1 | nr), data = wage))
+cat("The difference between the union_within and union_between coefficients (and thus the fixed-effect and between-effects) is 0.181352, and the difference is statistically significant, given that two times the standard error is less than the difference between the two effects coefficients.")
+```
+
+(e)
+```{r}
+
+fit_exper = lmer(lwage ~ black + hisp + union_within + union_between + married + exper + educ_c + year_c + (1 + exper | nr), data = wage)
+summary(fit_exper)
+
+anova(fit_3, fit_exper)
+cat("The new model with the random coefficient for exper is the better model, since the p-value on the anova test is less than 0.05")
+
+plot(ranef(fit_exper))
+
+cat("The random effects coefficient for nr indicates that there is variance in logged wage of 0.44716 between individuals. The random effects coefficient for exper indicates that there is variance in logged wage of 0.002923 for an additional year of labor-market experience for each individual. The random effects coefficient for residual indicates that there is variance in logged wage of 0.106681 within individuals over time.
+The negative correlation indicates that there is an inverse relationship between the random effects intercepts and random slopes for the exper variable; as random effects intercepts increase, random effects slopes decrease.")
+
+exper = ranef(fit_exper)
+cat("The estimate intercept for nr = 162 is -0.501628 and the exper coefficient is 0.086215.")
+```
+
+(f)
+```{r}
+
+library(lattice)
+fit_cross = lmer(lwage ~ black + hisp + union_within + union_between + married + exper + educ_c + (1 | nr) + (1 | year_c), data = wage)
+summary(fit_cross)
+
+cat("The random effect of 0.009 indicates the variability of average logged wages across different years")
+
+anova(fit_3, fit_cross) #this does not give me a p-value, I'm using AIC and BIC instead
+
+AIC(fit_cross, fit_3)
+BIC(fit_cross, fit_3)
+
+cat("Since the AIC and BIC are lower for the new model, it is better.")
+
+histogram(residuals(fit_cross))
+
+fit_cross_df = as.data.frame(ranef(fit_cross))
+histogram(fit_cross_df$condval[fit_cross_df$grpvar == "nr"])
+
+histogram(fit_cross_df$condval[fit_cross_df$grpvar == "year_c"])
+
+cat("If anything, only the distribution of person random effects appears normally distributed, and maybe the level-1 residuals if you really want to say that it's normally distributed.")
+```
+
+(g)
+```{r}
+
+fit_fixed = lmer(lwage ~ black + hisp + union_within + union_between + married + exper + educ_c + factor(year_c) + (1 | nr), data = wage)
+summary(fit_fixed)
+
+ranef(fit_cross)
+
+cat("The differences between the fixed effect coefficients and the random effect coefficients arise from the fact that the fixed effects coefficients are finding the effects within years, whereas the random effects account for changes within years and between years.")
+
+anova(fit_cross, fit_fixed)
+cat("Yes, this model fits better than the previous model.")
+```

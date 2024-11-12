@@ -1,0 +1,331 @@
+---
+title: "Problem Set 6"
+author: "Kendra Pinegar, Completion Code: 2994"
+date: "2024-02-28"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 1: 18.12
+```{r}
+
+#18.12a
+data = as.data.frame(c(1:1000))
+data$"c(1:1000)" = NULL
+
+data$x = rep(NA, 1000)
+data$ate = rep(NA, 1000)
+data$e0 = rep(NA, 1000)
+data$e1 = rep(NA, 1000)
+data$y0 = rep(NA, 1000)
+data$y1 = rep(NA, 1000)
+
+for (i in 1:1000){
+  data$x[i] = rnorm(1, 65, 3)
+  data$ate[i] = 5
+  data$e0[i] = rnorm(1, 0, 1)
+  data$e1[i] = rnorm(1, 0, 1)
+  data$y0[i] = 10 + 1.1*data$x[i] + 0 + data$e0[i]
+  data$y1[i] = 10 + 1.1*data$x[i] + data$ate[i] + data$e1[i]
+    
+}
+
+#18.12b
+
+#i
+cat("My interpretation of τ is the population average difference in test scores between students who received the extra tutoring session and students who did not receive the extra tutoring session.")
+
+#ii
+sate = mean(data$y1 - data$y0)
+sate
+
+#iii
+cat("SATE is different from τ because the SATE is the average treatment effect calculated for the sample, whereas τ is the average treatment effect calculated for the whole population. SATE will provide close approximations of what the population ATE is, but it won't be a perfect approximation.")
+
+#iv
+cat("The intercept for both lines indicates, first, that when a student previously scored a 0 on the test and doesn't receive the extra tutoring session that his score will be a 10 on the retake, and second, that when a student previously scored a 0 on the test and received the extra tutoring session that his score will be a 15 on the retake.")
+
+#v
+cat("When comparing a student who didn't receive the extra tutoring session and a student who received the extra tutoring session, the latter has, on average, an increase of β1 (1.1) in their quiz 1 retake score." )
+
+#vi
+library(ggplot2)
+
+ggplot(data = data) +
+  geom_point(aes(x = x,
+                 y = y0,
+                 color = "Y0")) +
+  geom_abline(slope = 1.1, intercept = 10, color = "darkmagenta") +
+  geom_point(aes(x = x,
+                 y = y1,
+                 color = "Y1")) +
+  geom_abline(slope = 1.1, intercept = 15, color = "darkgreen") +
+  scale_color_manual(values = c("magenta", "green")) +
+  labs(x = "0 = Control, 1 = Treatment",
+       y = "Test Scores",
+       colour = "Potential Outcomes")
+
+cat("This graph demonstrates that the students who received the extra tutoring session performed, on average, about 5 points better on the test than students who did not receive the extra tutoring session. There are some data points that overlap on both sides, but there are some relative differences between the two.")
+
+#18.12c
+data_new = as.data.frame(c(1:1000))
+data_new$"c(1:1000)" = NULL
+
+data_new$x = rep(NA, 1000)
+data_new$ate = rep(NA, 1000)
+data_new$e0 = rep(NA, 1000)
+data_new$e1 = rep(NA, 1000)
+data_new$y0 = rep(NA, 1000)
+data_new$y1 = rep(NA, 1000)
+data_new$y = rep(NA, 1000)
+
+data_new$z = rep(c(0,1), 500)
+data_new$z = sample(data_new$z, 1000)
+
+for (i in 1:1000){
+  data_new$x[i] = rnorm(1, 65, 3)
+  data_new$ate[i] = 5
+  data_new$e0[i] = rnorm(1, 0, 1)
+  data_new$e1[i] = rnorm(1, 0, 1)
+  data_new$y0[i] = 10 + 1.1*data$x[i] + 0 + data$e0[i]
+  data_new$y1[i] = 10 + 1.1*data$x[i] + data$ate[i] + data$e1[i]
+  data_new$y[i] = ifelse(data_new$z[i] == 0, data_new$y0[i], data_new$y1[i])
+}
+
+data_new$y0 = NULL
+data_new$y1 = NULL
+
+
+#i
+sate_estimate = mean(ifelse(data_new$z == 1, data_new$y, NA), na.rm = TRUE) - mean(ifelse(data_new$z == 0, data_new$y, NA), na.rm = TRUE)
+sate_estimate
+
+#ii
+(sate - sate_estimate)/sd(data_new$y)
+cat("The estimate SATE is about", (sate-sate_estimate)/sd(data_new$y), "standard deviations away from the SATE. Given that this value is less than 2 (or -2), the two values are close.")
+
+#iii
+cat("The estimate SATE is different than the SATE and τ because the SATE/τ are calculated using counterfactuals that wouldn't actually exist in the real world (outcomes for both treatments and controls for each tested student), and the estimated SATE only uses the observed values for individuals in the control and treatment groups. Therefore, the estimated SATE is a more rough estimate of the SATE and τ. Also, the intercept is now based on the student received the extra tutoring session or not, ")
+
+#18.12e
+
+library(rstanarm)
+
+#i
+fit = stan_glm(y ~ x + z, data = data_new, refresh = 0)
+print(fit, digits = 3)
+
+#ii
+cat("By estimate the ATE using linear regression, I gain a better understanding of how much different test scores actually lead to a varying retest score (not by much, the coefficient is", coef(fit)[2], "and the standard error is", se(fit)[2], "). The intercept is descriptive of the result of retaking the test, where a student who doesn't receive the extra tutoring session has, on average, a test retake score of", coef(fit)[1], ". Overall, I am able to see what differences in the treatment effect are a result of the act of retaking the test and the act of receiving the treatment/not receiving the treatment.")
+
+#iii
+cat("The assumptions that need to be made in order to believe this estimate include SUTVA (that there is no interference among units and no hidden versions of the treatment), ignorability.
+I know that ignorability is met because I randomly assigned the treatment group using the sample command, and I'm not sure how this could even be dependent on pre-treatment predictors given the nature that this is coded not based on any of the other variables.
+In order to know that the SUTVA assumption is met, I need to know that there is no spillover effect. I'm rather confident that the treatment distribution did not affect the reception of the treatment in any way (the ATE is always 5 in this situation), and I have even greater confidence that this assumption is met knowing that the errors were drawn independently of each other")
+
+#Sources used to complete this problem: https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/sample
+#I worked with Vanessa on this portion of the problem set
+```
+
+### Question 2:
+```{r}
+
+trains = read.csv("/Users/BYU Rental/Box/PERSONAL WORK/POLI 428/trains.csv")
+
+#2a
+
+ideology = stan_glm(ideology ~ treatment, data = trains, refresh = 0)
+print(ideology, digits = 3)
+
+#mad < 2; NO
+
+income = stan_glm(income ~ treatment, data = trains, refresh = 0)
+print(income, digits = 3)
+
+#mad < 2; NO
+
+us.born = stan_glm(us.born ~ treatment, data = trains, refresh = 0)
+print(us.born, digits = 3)
+
+#mad > 2; YES
+
+white = stan_glm(white ~ treatment, data = trains, refresh = 0)
+print(white, digits = 3)
+
+#mad < 2; NO
+
+male = stan_glm(male ~ treatment, data = trains, refresh = 0)
+print(male, digits = 3)
+
+#mad < 2; NO
+
+age = stan_glm(age ~ treatment, data = trains, refresh = 0)
+print(age, digits = 3)
+
+#mad > 2; YES
+
+college = stan_glm(college ~ treatment, data = trains, refresh = 0)
+print(college, digits = 3)
+
+#mad < 2; NO
+
+cat("There are imbalances in variables age and us.born; this may affect the treatment coefficient by making it appear that the treatment has more of a significant effect on exclusionary views than it actually does.")
+
+#2b
+
+basic = stan_glm(numberim ~ treatment, data = trains, refresh = 0)
+print(basic, digits = 3)
+
+cat("When comparing an individual who did not experience the native Hispanic treatment and an individual who did experience the native Hispanic treatment, the latter, on average, reported scores that were higher by", coef(basic)[2], "points, indicating more exclusionary attitudes towards immigrants. This effect is significant, given that the coefficient is greater than two times the standard error.")
+
+cat("The average reported score indicating exclusionary attitudes towards immigrants for those who were not exposed to the Spanis-speaking confederates at the train station is", coef(basic)[1])
+
+#2c
+cat("According to the model, the potential outcomes for a particular person are either", coef(basic)[1], " points of exclusionary attitudes towards immigrants if they weren't exposed to the Spanish-speaking confederates at the train station or", coef(basic)[1] + coef(basic)[2], "points of exclusionary attitudes towards immigrants if they were exposed to the Spanish-speaking confederates at the train station. The fundamental problem of causal inference refers to, in this context, the idea that the same person can not experience and then unexperience the scenario of being exposed to the Spanish-speaking confederates at the train station, and we don't have access to an exact replica of a person because that doesn't exist.")
+
+#2d
+
+ttest = t.test(numberim ~ treatment, data = trains)
+print(ttest)
+
+cat("The results from the t-test are the same as the coefficients from the regression, given that the mean in group 0 equals", coef(basic)[1], "and the mean in group 1 equals", coef(basic)[1] + coef(basic)[2])
+
+#2e
+fit_1 = stan_glm(numberim ~ treatment + age + us.born, data = trains, refresh = 0)
+print(fit_1, digits = 3)
+
+cat("The coefficients don't actually change very much; the original treatment coefficient was", coef(basic)[2], "and the new one controlling for the imbalanced pre-treatment predictors is", coef(fit_1)[2], "which is definitely not as great of a change as I would have thought. It is an increase of about", coef(fit_1)[2] - coef(basic)[2], "but that change is not very large. The predictors themselves have coefficients of size", coef(fit_1)[3], "for the age variable and", coef(fit_1)[4], "for the us.born variable, but they are not statistically significant coefficients. Like I said before, given that these variables were imbalanced, I thought that they would have greater effects on the treatment predictor.")
+
+#2f
+
+fit_2 = stan_glm(numberim ~ treatment + ideology + income + us.born + white + male + age + college, data = trains, refresh = 0)
+print(fit_2, digits = 3)
+summary(fit_2, digits = 3)
+
+matrix = data.frame(as.matrix(fit_2))
+
+
+quantile(matrix$treatment, c(0.1, 0.9))
+quantile(matrix$us.born, c(0.1, 0.9))
+quantile(matrix$ideology, c(0.1, 0.9))
+quantile(matrix$income, c(0.1, 0.9))
+quantile(matrix$white, c(0.1, 0.9))
+quantile(matrix$male, c(0.1, 0.9))
+quantile(matrix$college, c(0.1, 0.9))
+
+cat("I am deciding to keep the following variables, for having coefficients greater than 2 times their own standard deviation: ideology and white.")
+ 
+covariates = stan_glm(numberim ~ treatment + ideology + white + income, data = trains, refresh = 0)
+print(covariates, digits = 3)
+
+cat("The treatment coefficient should decrease and the standard error increase, considering the fact that controlling for variables that have increasing effects on the exclusionary attitudes will cover some of the effect initially observed in the basic regression model.
+The treatment regression coefficient is positive, which should indicate that those individuals who are exposed to the Spanish-speaking confederates at the train station are more likely to express stronger exclusionary attitudes towards immigrants, but in comparison to the basic regression model, the treatment coefficient decreases and is no longer statistically significant because it is not greater than 2 times the standard error.
+The ideology coefficient indicates that a person with a greater conservative ideology score increases the likelihood that an individual expresses exlucionary attitudes towards immigrants, and this coefficient is signifiant because it is greater than 2 times the standard error.
+The white coefficient indicates that a white person is less likely to express exclusionary attitudes towards immigrants, but this coefficient is not significant because it is less than 2 times the standard error.
+The income coefficient indicates that a person in a greater income group is less likely to express exclusionary attitudes towards immigrants, and this coefficient is significant because it is less than 2 times the standard error.")
+
+#2g
+
+cat("I am guessing that this variable will have a significant amount of responses in the middle (3) and that this will prevent any strong imbalances on either side of the variable (1 or 5). It's rather common for individuals to report moderate views when they don't have a reason to report strongly in any specific way, unless they have strong, pre-formed political views.")
+
+numberim.pre = stan_glm(numberim.pre ~ treatment, data = trains, refresh = 0)
+print(numberim.pre, digits = 3)
+
+cat("The balance test indicates that the variable is actually balanced and that there are not any significant increases to either side. The coefficient is less than 2 times the standard error (which overlaps with 0), and so this positive tendency is not statistically significant than 0 (which indicates no real change/imbalance).")
+
+#2h
+fit_3 = stan_glm(numberim ~ treatment + numberim.pre, data = trains, refresh = 0)
+print(fit_3, digits = 3)
+
+cat("I predict that the treatment coefficient decreases and the standard error increases to some extent, since numberim.pre is a balanced variable that could account for some of the exclusionary views expressed post-treatment.
+The regression coefficient does decrease, but the standard error also decreases with it, so much so that the treatment regression coefficient is still greater than 2 times the standard error. The numberim.pre variable, however, is a large predictor of the exclusionary views, holding a greater effect on exclusionary views than the treatment.")
+
+#2i
+
+library(MASS)
+
+fit_4 = polr(factor(numberim) ~ treatment + factor(numberim.pre), data = trains)
+summary(fit_4)
+
+trains$numberim.pre = as.factor(trains$numberim.pre)
+trains$numberim.pre = relevel(trains$numberim.pre, ref = 3)
+
+fit_5 = polr(factor(numberim) ~ treatment + factor(numberim.pre), data = trains)
+summary(fit_5)
+
+cat("The coefficients on numberim.pre do not support treating it as an interval variable because the intervals are not of the same size. All of the interval values are statistically significant (coefficients are greater than 2 times the standard error), so the values are the same direction and level of statistical significance.")
+
+#2j
+
+trains$numberim.pre = as.integer(trains$numberim.pre)
+trains$numberim_change = trains$numberim - trains$numberim.pre
+
+fit_6 = stan_glm(numberim_change ~ treatment, data = trains, refresh = 0)
+print(fit_6, digits = 3)
+
+cat("The intercept means that an individual who is not exposed to Spanish-speaking confederates will have, on average, a decrease in pre-experiment to post-experiment exclusionary scores of", coef(fit_6)[1], ", and the treatment coefficient means that an individual who is exposed to Spanish-speaking confederates will have, on average, an increase in pre-experiment to post-experiment exclusionary scores of", coef(fit_6)[1] + coef(fit_6)[2])
+
+cat("Quantitatively, the answers are differently because the DID model is predicting how the difference in exclusionary views changes from pre to post while comparing control and treatment groups. While the model from part h is showing us the difference between the control and treatment groups in the exclusionary views, this DID model shows us the differences from baseline to endline between the control and treatment groups in the exclusionary views. This DID model is better because it allows us to hold constant the direction that the exclusionary views scores naturally move in without a treatment in the first place. It essentially demonstrates that exclusionary views decrease without a treatment, so it puts the effect of the treatment more into perspective.")
+
+#2k
+cat("The intercept means that an individual who is not exposed to Spanish-speaking confederates will have, on average, a decrease in pre-experiment to post-experiment exclusionary scores of", coef(fit_6)[1], ", meaning their views get less exclusionary, and the treatment coefficient means that an individual who is exposed to Spanish-speaking confederates will have, on average, an increase in pre-experiment to post-experiment exclusionary scores of", coef(fit_6)[1] + coef(fit_6)[2], "meaning their views get more exclusionary.")
+
+cat("The fundamental problem of causal inference here refers to the idea that we cannot replicate the perfectly the change in an individual's exclusionary scores based on their exposure to Spanish-speaking confederates at a train station; we can't replicate what that would look like when a person is and is not exposed, and therefore, we cannot replicate the differences in scores.")
+
+#2l
+
+fit_7 = stan_glm(numberim ~ treatment + numberim.pre + ideology + white + income, data = trains, refresh = 0)
+print(fit_7, digits = 3)
+summary(fit_7, digits = 3)
+
+cat("The white variable increased from", coef(covariates)[4], "to", coef(fit_7)[5], "and it still isn't significant.
+The ideology variable decreased from", coef(covariates)[3], "to", coef(fit_7)[4], " and it remains significant.
+The income variable increased from", coef(covariates)[6], "to", coef(fit_7)[6], "and it remains significant. I assume that these decreases/increases of the variables towards 0 is a result of the fact that numberim.pre explains more of the deviation in results than do those variables. It appears that numberim.pre nearly cancels out the effect of ideology on the exlusionary score almost entirely.")
+
+matrix = data.frame(as.matrix(fit_7))
+
+quantile(matrix$treatment, c(0.1, 0.9))
+quantile(matrix$ideology, c(0.1, 0.9))
+quantile(matrix$white, c(0.1, 0.9))
+quantile(matrix$income, c(0.1, 0.9))
+
+cat("I am going to drop the variable ideology because the 90% confidence interval includes zero in it.")
+
+fit_8 = stan_glm(numberim ~ treatment + numberim.pre + white + income, data = trains, refresh = 0)
+print(fit_8, digits = 3)
+
+#2m
+
+cat("I'm guessing that the treatment coefficient will probably decrease and the standard error increase.")
+fit_9 = stan_glm(numberim ~ treatment + numberim.pre + ideology + white + income + factor(station), data = trains, refresh = 0)
+print(fit_9, digits = 3)
+
+cat("The treatment coefficient decreases from the previous model and the standard error increases in comparison to the previous model, so much so that the treatment coefficient is no longer statistically significant.")
+
+#2n
+
+fit_10 = stan_glm(numberim ~ treatment*numberim.pre, data = trains, refresh = 0)
+print(fit_10, digits = 3)
+
+cat("The treatment coefficient indicates that when an individual is exposed to the Spanish-speaking confederates at the train station, they will have an exclusionary view that is", coef(fit_10)[2], "points higher than an individual who is not exposed to the Spanish-speaking confederates at the train station, holding all else constant.")
+
+#2o
+
+trains$numberim_c = trains$numberim - 3
+trains$numberim.pre_c = trains$numberim.pre - 3
+
+fit_11 = stan_glm(numberim_c ~ treatment*numberim.pre_c, data = trains, refresh = 0)
+print(fit_11, digits = 3)
+
+cat("The intercept coefficient indicates that when an individual is not exposed to the Spanish-speaking confederates at the train station, they will have an exclusionary view of", coef(fit_11)[1], "points.
+The treatment coefficient indicates that when an individual is exposed to the Spanish-speaking confederates at the train station but they have a pre-experiment exclusionary score of 3, they will have, on average, an increase in exclusionary views by", coef(fit_11)[2], "points.
+The numberim.pre coefficient indicates that when an individual has a pre-experiment exclusionary score of 4 in comparison to another individual with a pre-experiment exclusionary score 3 but they were not exposed to the Spanish-speaking confederates, they will have, on average, an increase in post-experiment exclusionary score by", coef(fit_11)[3], "points.
+The interaction coefficient indicates that when an individual was exposed to the Spanish-speaking confederates at the train station and had a pre-experiment exclusionary score of 4, the individual will have a slight increase in exclusionary score; however, the coefficient is not statistically significant (not greater than 2 times the standard error).")
+
+#I worked alone on this portion of the problem set
+```

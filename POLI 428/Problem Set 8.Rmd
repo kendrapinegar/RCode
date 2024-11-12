@@ -1,0 +1,471 @@
+---
+title: "Problem Set 8"
+author: 'Kendra Pinegar; Completion Code: I think it was 7400 but ngl it did not copy
+  and paste and I moved on'
+date: "2024-03-13"
+output:
+  html_document: default
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Question 1: Do political institutions cause economic performance?
+
+##### a
+```{r}
+library(foreign)
+library(rstanarm)
+library(ggplot2)
+exprop = read.dta("/Users/kap237/Box/PERSONAL WORK/POLI 428/exprop.dta")
+
+exprop = subset(exprop, exprop$excolony == 1)
+exprop = subset(exprop, !is.na(exprop$logpgp95))
+exprop = subset(exprop, !is.na(exprop$avexpr))
+exprop = subset(exprop, !is.na(exprop$logem4))
+
+#a
+ggplot(data = exprop,
+       aes(x = avexpr,
+           y = logpgp95,
+           label = shortnam)) +
+  geom_point() +
+  geom_text(hjust = -1, vjust = 1) +
+  labs(x = "Average Protection against Expropriation Risk (1985-1995)",
+       y = "Logged GDP per Capita (1995)")
+
+```
+
+##### b
+```{r}
+
+#b
+fit = stan_glm(logpgp95 ~ avexpr, data = exprop, refresh = 0)
+print(fit, digits = 3)
+
+cat("When comparing a country with 1 point higher on the index of protection against expropriation to a country with 1 point lower on the index of protection against expropriation, the former country has, on average, an logged GDP per capita that is", coef(fit)[2], "logged-odds higher. This coefficient is statistically significant, given that the coefficient is greater than two times the standard error,", 2*se(fit)[2])  
+
+uga_mex_cases = data.frame(avexpr = c(0, 4.454545, 7.5),
+                           logpgp95 = c(0, 6.966024, 8.943768))
+
+row.names(uga_mex_cases) = c("base", "uganda", "mexico")
+
+fit_predict = predict(fit, newdata = uga_mex_cases)
+fit_predict[3] - fit_predict[2]
+
+uganda = 4.454545*coef(fit)[2] + coef(fit)[1]
+mexico = 7.5*coef(fit)[2] + coef(fit)[1]
+cat("There's a predicted difference in logged GDP of about", mexico - uganda, "or of about", fit_predict[3] - fit_predict[2], "if you want to use substantive effects.")
+cat("There's a true difference in logged GDP of about", exprop$logpgp95[exprop$shortnam == "MEX"] - exprop$logpgp95[exprop$shortnam == "UGA"])
+```
+
+##### c
+```{r}
+#c
+cor(exprop$avexpr, exprop$logem4, use = "complete.obs")
+cor(exprop$logpgp95, exprop$logem4, use = "complete.obs")
+#potential confounder
+
+cor(exprop$avexpr, exprop$democ00a, use = "complete.obs")
+cor(exprop$logpgp95, exprop$democ00a, use = "complete.obs")
+#potential confounder? does it work if they're in opposite directions
+
+cor(exprop$avexpr, exprop$euro1900, use = "complete.obs")
+cor(exprop$logpgp95, exprop$euro1900, use = "complete.obs")
+#potential confounder
+
+cor(exprop$avexpr, exprop$lat_abst, use = "complete.obs")
+cor(exprop$logpgp95, exprop$lat_abst,  use = "complete.obs")
+#less potential confounder; R is small
+
+cor(exprop$avexpr, exprop$malfal94, use = "complete.obs")
+cor(exprop$logpgp95, exprop$malfal94, use = "complete.obs")
+#opposite directions
+
+cat("All of these variables have the potential to be confounding variables; however, two variables, the logged value of settler mortality (logem4) and the percentage of population of European descent in 1900 (euro1900) are the most likely to be confounders, given that they both have the highest correlation values with both the independent and dependent variables.")
+```
+
+##### d
+```{r}
+
+#First condition: corr(Z, X) =/= 0
+cor(exprop$avexpr, exprop$logem4, use = "complete.obs")
+cat("The correlation coefficient is not equal to 0 for sure, so the first condition is satisfied.")
+
+cat("It makes sense that settler mortality could work as an instrument because settler mortality from that time period would lead to greater economic growth at the time and overall institutional stability, which would likely persist into the future. Also, there's no specific country examples that defy this assumption, that have the opposite effect.")
+
+```
+
+##### e
+```{r}
+
+exprop$em4 = exp(exprop$logem4)
+summary(exprop$em4)
+
+cat("The new, unlogged version of settler mortality ranges from 8.55 deaths to 2940 deaths. The median settler mortality number is 78.15 deaths and the mean settler mortality is 248.02 deaths. Some interesting cases include what I'm guessing is Malawi (MLI), which has a very high settler mortality rate and a very low protection against expropriation risk. Similarly, Nigeria (NGA) has a high settler mortality rate, although not quite as high as Malawi, with a still relatively low protection against expropriation risk.")
+
+ggplot(data = exprop,
+        aes(x = avexpr,
+            y = em4,
+            label = shortnam)) +
+   geom_point() +
+   geom_text(hjust = -1, vjust = 1) +
+   labs(x = "Average Protection against Expropriation Risk (1985-1995)",
+        y = "Settler Mortality Rate")
+```
+
+##### f
+```{r}
+
+ggplot(data = exprop,
+       aes(x = logem4,
+           y = avexpr,
+           label = shortnam)) +
+  geom_point() +
+  geom_text(hjust = -1, vjust = 1) +
+  labs(x = "Logged Settler Mortality Rate",
+       y = "Average Protection against Expropriation Risk (1985-1995)")
+
+cor(exprop$logem4, exprop$avexpr, use = "complete.obs")
+cat("There's a pretty clear negative relationship here; as logged settler mortality rate increases, the average protection against expropriation risk decreases.")
+
+```
+
+##### g
+```{r}
+
+fit_3 = stan_glm(avexpr ~ democ00a, data = exprop, refresh = 0)
+print(fit_3, digits = 3)
+
+cat("When a country has a higher democracy score in 1900, in comparison to a country with a lower democracy score in 1900, the former has, on average, an increase in the index score of the average protection against expropriation risk. This value is statistically significant, given that the regression coefficient for the democracy score is greater than two times the standard error.")
+
+fit_4 = stan_glm(avexpr ~ euro1900, data = exprop, refresh = 0)
+print(fit_4, digits = 3)
+
+cat("When a country has a higher percentage of European descent in its population in 1900, in comparison to a country with a lower percentage of European descent in its population in 1900, the former has, on average, an increase in the index score of the average protection against expropriation risk. This value is statistically significant, given that the regression coefficient for the European population percentage is greater than two times the standard error.")
+
+fit_5 = stan_glm(avexpr ~ logem4, data = exprop, refresh = 0)
+print(fit_5, digits = 3)
+
+cat("When a country has a higher logged settler mortality, in comparison to a country with a lower logged settler mortality, the former has, on average, a decrease in the index score of the average protection against expropriation risk. This value is statistically significant, given that the regression coefficient for settler mortality is greater than two times the standard error.")
+```
+
+##### h
+```{r}
+#stage 1
+stage1_hand = lm(avexpr ~ logem4, data = exprop)
+summary(stage1_hand, digit = 3)
+exprop$avexpr_hat = predict(stage1_hand)
+#stage 2
+stage2_hand = lm(logpgp95 ~ avexpr_hat, data = exprop)
+summary(stage2_hand, digit = 3)
+```
+
+##### i
+```{r}
+library(ivreg)
+
+fit_ivreg = ivreg(logpgp95 ~ avexpr | logem4, data = exprop)
+summary(fit_ivreg)
+
+summary(stage2_hand)
+
+cat("The results are the same in terms of the coefficients from the previous part; it's just the standard errors that are different, but not enough to change the significance of coefficience.")
+
+summary(fit_ivreg)
+print(fit, digits = 3)
+
+cat("The results in comparison to the OLS model have a greater regression coefficient. Both coefficients are statistically significant, just the ivreg coefficient is greater in size. The weak instruments test is statistically significant, and the statistic is greater than 10, meaning that X and Z are overlapping enough and the instrument is good. The Wu-Hausman test is statistically significant, meaning that the two-stage IV model is better than the regular OLS model.")
+
+uga_mex_cases_ivreg = data.frame(avexpr = c(0, 4.454545, 7.5),
+                           logpgp95 = c(0, 6.966024, 8.943768),
+                           logem4 = c(0, 5.634789, 4.26268))
+
+row.names(uga_mex_cases_ivreg) = c("base", "uganda", "mexico")
+
+fit_predict = predict(fit_ivreg, newdata = uga_mex_cases_ivreg)
+fit_predict[3] - fit_predict[2]
+
+uganda = 4.454545*coef(fit_ivreg)[2] + coef(fit_ivreg)[1]
+mexico = 7.5*coef(fit_ivreg)[2] + coef(fit_ivreg)[1]
+cat("There's a predicted difference in logged GDP of about", mexico - uganda, "when using logged settler mortality rate as an instrumental variable. Substatntive effects give this same result.")
+cat("There's a true difference in logged GDP of about", exprop$logpgp95[exprop$shortnam == "MEX"] - exprop$logpgp95[exprop$shortnam == "UGA"])
+```
+
+##### j
+```{r}
+library(brms)
+
+f1 = bf(avexpr ~ logem4)
+f2 = bf(logpgp95 ~ avexpr)
+fit_brms = brm(f1 + f2, data = exprop, refresh = 0)
+print(fit_brms, digits = 3)
+summary(fit_ivreg)
+
+cat("The results vary slightly when comparing the brms package to the ivreg package, with differences in the second decimal place of the regression coefficients and the standard errors; however, the coefficients are still statistically significant. Since the results vary only slightly when comparing the brms results to the ivreg results, the differences between the brms model and the OLS are similar to the differences between the ivreg model and the OLS model, where the brms model has a regression coefficient that is greater in size, but they are both statistically significant.")
+```
+
+##### k
+```{r}
+
+ggplot(data = exprop,
+       aes(x = logem4,
+           y = logpgp95,
+           label = shortnam)) +
+  geom_point() +
+  geom_text(hjust = -1, vjust = 1) +
+  labs(x = "Logged Settler Mortality Rate",
+       y = "Logged GDP per Capita in 1995")
+
+cat("As logged settler mortality rate increases, logged GDP per capita in 1995 decreases.")
+```
+
+##### l
+```{r}
+
+fit_reduced = lm(logpgp95 ~ logem4, data = exprop)
+summary(fit_reduced, digits = 3)
+
+cat("When comparing a country with higher logged mortality rate and a country with lower logged mortality rate, the former has, on average, a decrease in logged GDP per capita in 1995. This coefficient is statistically significant, given that the coefficient is greater than two times the standard error.")
+```
+
+##### m
+```{r}
+
+fit_alt = lm(logpgp95 ~ lat_abst, data = exprop)
+summary(fit_alt, digits = 3)
+
+cat("When comparing a country that has a higher absolute distance from the equator and a country that has a lower absolute distancefrom the equator, the former has, on average, an increase in logged GDP per capita in 1995. This coefficient is statistically significant, given that the coefficient is greater than two times the standard error.")
+
+fit_alt_ivreg = ivreg(logpgp95 ~ avexpr + lat_abst | lat_abst + logem4, data = exprop)
+summary(fit_alt_ivreg, digits = 3)
+
+cat("When controlling for the absolute distance of a country from the equator, the regression coefficient for the average expropriation rate is greater than the regression coefficient from the 2sls that doesn't control for the absolute distance of a country from the equator, comparing", coef(fit_ivreg)[2], "to", coef(fit_alt_ivreg)[2])
+
+```
+
+##### n
+```{r}
+
+fit_alt_2 = lm(logpgp95 ~ malfal94, data = exprop)
+summary(fit_alt_2, digits = 3)
+
+cat("When comparing a country with greater malaria prevalence in 1994 to a country with lower malaria prevalence in 1994, the former has, on average, a decrease in logged GDP per capita in 1995.This coefficient is statistically significant, given that the coefficient is greater than two times the standard.")
+
+fit_alt_2_ivreg = ivreg(logpgp95 ~ avexpr + malfal94 | malfal94 + logem4, data = exprop)
+summary(fit_alt_2_ivreg, digits = 3)
+
+cat("When controlling for the prevalence of malaria in 1994, the regression coefficient from this 2sls for the average expropriation rate is much less than the regression coefficient from the 2sls that doesn't control for the prevalence of malaria in 1994, comparing", coef(fit_ivreg)[2], "to", coef(fit_alt_2_ivreg)[2])
+```
+
+##### o
+```{r}
+#i
+cat("SUTVA. I don't think this is met because settler mortality rate does have the ability to affect other variables, since death is often correlated with things like the wealth of a country. A country's individual settler mortality rate could be affecting other variables in other countries.")
+
+#ii
+summary(stage2_hand)
+cat("When comparing one country that has a higher protection against expropriation and complied (so, countries that have high correlation between settler mortality and protection against expropriation) and another country that has a lower protection against expropriation, the former has, on average,", coef(stage2_hand)[2], "more logged GDP in 1995.")
+
+#iii
+summary(fit_reduced)
+cat("When comparing a country with higher logged mortality rate and a country with lower logged mortality rate, regardless of the type of correlation between logged mortality rate and protection against expropriation (thus indicating ITT effects, the former has, on average, a decrease in logged GDP per capita in 1995. This coefficient is statistically significant, given that the coefficient is greater than two times the standard error.")
+
+```
+
+### Question 2: Do politicians or voters pick policies?
+
+##### a
+```{r}
+library(haven)
+
+policies = read_dta("/Users/kap237/Box/PERSONAL WORK/POLI 428/policies.dta")
+
+head(policies)
+
+hist(policies$demvoteshare)
+
+hist(policies$democrat)
+
+hist(policies$score)
+```
+
+##### b
+```{r}
+cat("The assignment mechanism is the 'democrat' variable; the running variable is the 'demvoteshare' variable; the cutpoint is 0.5; and the outcome variable is the 'score' variable.")
+```
+
+##### c
+```{r}
+
+cat("If convergence is true, this means that a scatter plot would show a rather linear-looking model where, as the democratic vote share of a candidate increases, their policy voting score would also increase proportionately to the share of voters that are democratic. However, if divergence is true, then we would expect to see a scatter plot where there is a jump in the policy voting score at about 0.5, given that this is the cutoff point where a majority of the democratic vote share has been obtained in order to elect a democratic representative. As such, we might expect to see two somewhat horizontal lines, given that divergence suggests that politicians always pursue their own preferred policy goals and that this doesn't change based on the share of the vote that they obtained in order to be elected.")
+
+```
+
+##### d
+```{r}
+
+cat("Yes, the assignment of the treatment is rule-based because the rule is very specific and pre-determined cutoff point, since 0.5 is a pretty natural cutoff between democrat/republican.")
+
+```
+
+##### e
+```{r}
+library(tidyverse)
+
+cat("The design is sharp; there is a clear drop off that remains consistent throughout the data, and the data doesn't gradually get further apart.")
+
+policies$democrat = as.factor(policies$democrat)
+
+#table
+policies$demvoteshare_b = ifelse(policies$demvoteshare > 0.5, 1, 0)
+table(policies$demvoteshare_b, policies$democrat) #everyone with positive rule2 got the 
+cat("This table demonstrates that everyone who is a democrat has a democratic vote share over 50% and everyone who is not a democrat has a democrativ vote share under 50%.")
+
+#graph
+ggplot(policies,
+       aes(x = demvoteshare,
+           y = democrat,
+           color = democrat)) +
+  geom_point(size = 0.5, alpha = 0.5,
+             position = position_jitter(width = 0, height = 0.25)) +
+  geom_vline(xintercept = 0.5) +
+  labs(x = "demvoteshare", y = "democrat") +
+  guides(color = "none") +
+  theme_minimal()
+
+policies_1 <- policies %>%
+  select(democrat, demvoteshare, demvoteshare_b, year)
+
+cat("Same thing shown here.")
+
+```
+
+##### f
+```{r}
+library(rddensity)
+library(rdrobust)
+
+#histogram
+ggplot(policies,
+       aes(x = demvoteshare,
+           fill = democrat)) +
+  geom_histogram(color = "white", binwidth = 0.05, center = 0.5) +
+  geom_vline(xintercept = 0.5) +
+  labs(x = "Demvoteshare", y = "Count", fill = "Democrat")
+
+#McCrary density test
+test_density = rddensity(policies$demvoteshare, c = 0.5)
+summary(test_density)
+cat("The robust row has a p-value that is greater than 0.05, meaning that the difference between the two sides where 0.5 is the cutpoint is robust and is not statistically significantly different.")
+
+#density plot
+plot_density_test = rdplotdensity(rdd = test_density,
+                                   X = policies$demvoteshare,
+                                   type = "both")
+
+```
+
+##### g
+```{r}
+
+ggplot(policies,
+       aes(x = demvoteshare,
+           y = score,
+           color = democrat)) +
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(data = filter(policies, demvoteshare <= 0.5), method = "lm", color = "black") +
+  geom_smooth(data = filter(policies, demvoteshare > 0.5), method = "lm", color = "black") +
+  geom_vline(xintercept = 0.5) +
+  labs(x = "Demvoteshare", y = "ADA Score", color = "Democrat")
+
+cat("There are so many 0s and 1s (meaning that candidates ran unopposed) that are seeming to skew the data. We should fix that.")
+```
+
+##### h
+```{r}
+
+new = subset(policies, policies$demvoteshare != 1 & policies$demvoteshare != 0)
+
+ggplot(new,
+       aes(x = demvoteshare,
+           y = score,
+           color = democrat)) +
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(data = filter(new, demvoteshare <= 0.5), method = "lm", color = "black") +
+  geom_smooth(data = filter(new, demvoteshare > 0.5), method = "lm", color = "black") +
+  geom_vline(xintercept = 0.5) +
+  labs(x = "Demvoteshare", y = "ADA Score", color = "Democrat")
+
+```
+
+##### i
+```{r}
+
+new$demvoteshare_c = new$demvoteshare - 0.5
+
+fit = lm(score ~ demvoteshare_c + democrat, data = new)
+summary(fit, digits = 3)
+
+cat("When comparing a democratic representative and republican representative, the former has, on average,", coef(fit)[3], "points higher of an ADA score. This result is statistically significant, given that the regression coefficient is greater than two times the standard error.")
+
+cat("When comparing a representative that has 1 point higher of democratic vote share and a representative that has 1 point lower of democratic vote share, the former has, on average,", coef(fit)[2], "points lower of an ADA score. This result, however, is not statistically significant, given that the regression coefficient is not greater than two times the standard error.")
+
+cat("Essentially, these coefficients demonstrate the discontinuity of the slopes of the lines. While the slope of both lines may be -2ish, the difference between the values of ADA scores between democrats and republicans differ by about 47ish points.")
+```
+
+##### j
+```{r}
+
+fit_1 = lm(score ~ demvoteshare_c*democrat, data = new)
+print(fit_1, digits = 3)
+
+cat("When comparing a democratic representative and republican representative when both have a democratic vote share of 50% (the cutoff point), the former has, on average,", coef(fit_1)[3], "points higher of an ADA score. This result is statistically significant, given that the regression coefficient is greater than two times the standard error.")
+
+cat("When comparing a representative that has 1 point higher of democratic vote share and a representative that has 1 point lower of democratic vote share when both are republican representatives, the former has, on average,", coef(fit_1)[2], "points lower of an ADA score. This result is statistically significant, given that the regression coefficient is greater than two times the standard error.")
+
+cat("When comparing a representative that has 1 point higher of democratic vote share and is a democrat to a representative that has 1 point lower of democratic vote share, the former has, on average,", coef(fit_1)[3] + coef(fit_1)[4], "and this result is statistically significant, given that the regression coefficient is greater than two times the standard error.")
+
+cat("This connects to part h because I can clearly see that the estimated score line seems to be at about 68 for democratic representatives.")
+```
+
+##### k
+```{r}
+new_cutpoint = subset(new, new$demvoteshare >= 0.48 & new$demvoteshare <= 0.52)
+
+fit_2 = lm(score ~ demvoteshare_c + democrat, data = new_cutpoint)
+summary(fit_2, digits = 3)
+summary(fit, digits = 3)
+
+cat("While only including a smaller bandwidth of observations can be a technique used to satisfy the ignorability assumption, a model that correctly reflects the data can also be used to do this. Since the simple model including all of the observations (with the exception of observations with 0 and 1 voteshares) seems to model the data well, as displayed by the graph, I prefer the first model, since the second model seems to demonstrate large coefficients that don't reflect the data as seen in the chart and aren't even interpretable in the context of the ADA scores.")
+```
+
+##### l
+```{r}
+rdrobust(y = new$score, x = new$demvoteshare_c, c = 0) |>
+  summary()
+
+#yep seems about right
+```
+
+##### m
+```{r}
+rdplot(y = new$score, x = new$demvoteshare_c, c = 0)
+```
+
+##### n
+```{r}
+cat("It appears that politicians pick policies. Given that this regression discontinuity seems to meet the required assumptions like ignorability, the fact that there's no discontinuity in the running variable, and that the process of assigning the treatment is rule-based and not random, the discontinuity that we observed in between democratic and republican representatives demonstrates that there is divergence. If we were to observe convergence, we should see no discontinuity at the cutpoint, but both the graph and the regression coefficients demonstrate that there is a discontinuity.")
+```
+
+##### o
+```{r}
+
+cat("Given that the incumbency variable accounts for republican incumbents and liberal incumbents by having a -1 0 1 variable, I can most likely account for these divides by using the incumbency variable as the assignment variable and then interacting/incorporating party with the demvoteshare variable in the regression to continue to use a regression discontinuity. I would obviously need to think through this a little more theoretically, but I also am unfamiliar with the whole rest of the dataset and don't have a codebook, so I don't really have the tools necessary to perfectly answer this question.")
+```
+
+##### I worked alone on these problem sets, except for receiving feedback in the TA lab.
