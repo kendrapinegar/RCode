@@ -1,6 +1,7 @@
-Here is a description of the projects and tasks I worked on for Dr. Ethan Busby of the Political Science Department at Brigham Young University:
+Welcome to my Ethan Busby Research folder. I worked on the following projects (some of which are represented here in this folder):
 
 Cleaned conjoint experiment results on surveys concerning political extremism in the United States to allow for subsequent MM and AMCE analysis (which I also conducted) on a variety of data sets (POC23, Public22, Academic22)
 Ran interactions to understand moderating effect of party affiliation on listening effect in conjoints
 Conducted data quality analysis to ensure high-quality conjoint experiment data unaffected by repetition of tasks
-Ran gender-specific model analyses
+Ran gender-specific model analyses on conjoint data to understand the gender variances of views on political extremism
+Creating code to work with LLMs to automatically code open-ended survey responses for compliance with prompt
